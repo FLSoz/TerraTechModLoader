@@ -19,7 +19,7 @@ namespace LogManager
                 };
 
                 // Rules for mapping loggers to targets            
-                Manager.config.AddRule(LogLevel.Info, LogLevel.Fatal, logconsole);
+                Manager.config.AddRule(LogLevel.Warn, LogLevel.Fatal, logconsole);
 
                 // Apply config           
                 NLog.LogManager.Configuration = Manager.config;

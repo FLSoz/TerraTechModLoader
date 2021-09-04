@@ -40,11 +40,9 @@ namespace ModManager
         ));
         // internal static readonly string TTSteamDir = @"E:/Steam/steamapps/common/TerraTech";
         private static readonly string QModsDir = Path.Combine(TTSteamDir, "QMods");
-        private static readonly string LogsDir = Path.Combine(TTSteamDir, "Logs");
         private static readonly string WorkshopDir = Path.Combine(TTSteamDir, @"../../workshop/content/285920/");
         internal const int DEFAULT_LOAD_ORDER = 10;
 
-        private const string DEBUG_PREFIX = "[ModManager]";
         internal static NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
         internal static void ConfigureLogger()
         {
@@ -149,11 +147,11 @@ namespace ModManager
                     foreach (FileInfo dll in RemoteDlls.Concat(LocalDlls).Concat(enabledQModDlls)) {
                         if (args.Name.Contains(Path.GetFileNameWithoutExtension(dll.Name)))
                         {
-                            Console.WriteLine($"{ModManager.DEBUG_PREFIX} Found assembly " + args.Name);
+                            logger.Info("Found assembly {assembly}", args.Name);
                             return Assembly.LoadFrom(dll.FullName);
                         }
                     }
-                    Console.WriteLine($"{ModManager.DEBUG_PREFIX} Could not find assembly " + args.Name);
+                    logger.Info("Could not find assembly {assembly}", args.Name);
                     return null;
                 };
 

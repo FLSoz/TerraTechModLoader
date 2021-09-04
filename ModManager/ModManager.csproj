@@ -108,4 +108,8 @@
     <Error Condition="!Exists('..\packages\InjectModuleInitializer.2.0.3\build\InjectModuleInitializer.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\InjectModuleInitializer.2.0.3\build\InjectModuleInitializer.targets'))" />
   </Target>
   <Import Project="..\packages\InjectModuleInitializer.2.0.3\build\InjectModuleInitializer.targets" Condition="Exists('..\packages\InjectModuleInitializer.2.0.3\build\InjectModuleInitializer.targets')" />
+  <PropertyGroup>
+    <PostBuildEvent>
+    </PostBuildEvent>
+  </PropertyGroup>
 </Project>
