@@ -177,7 +177,7 @@ namespace ModManager
             [HarmonyPrefix]
             public static bool Prefix(SteamDownloadItemData item, bool remote)
             {
-                WorkshopLoader.LoadWorkshopData(item, remote);
+                WorkshopLoader.LoadWorkshopMod(item, remote);
                 return false;
             }
         }

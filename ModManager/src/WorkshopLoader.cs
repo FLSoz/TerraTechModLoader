@@ -73,7 +73,7 @@ namespace ModManager
 			Singleton.Manager<ManGameMode>.inst.TriggerSwitch<ModeAttract>();
 		}
 
-		internal static void LoadWorkshopData(SteamDownloadItemData item, bool remote)
+		internal static void LoadWorkshopMod(SteamDownloadItemData item, bool remote)
         {
 			CommandOperation<SteamDownloadItemData> commandOperation = new CommandOperation<SteamDownloadItemData>();
 			commandOperation.AddConditional(new Func<SteamDownloadItemData, bool>(SteamConditions.CheckItemNeedsDownload), new Command<SteamDownloadItemData>[]

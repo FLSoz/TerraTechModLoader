@@ -33,14 +33,17 @@ namespace ModManager
         private static bool patched = false;
         internal const string HarmonyID = "com.flsoz.ttmodding.modmanager";
 
-        internal static readonly string TTSteamDir = Path.GetFullPath(Path.Combine(
+        /* internal static readonly string TTSteamDir = Path.GetFullPath(Path.Combine(
             AppDomain.CurrentDomain.GetAssemblies()
             .Where(assembly => assembly.GetName().Name == "Assembly-CSharp").First().Location
             .Replace("Assembly-CSharp.dll", ""), @"../../"
-        ));
+        )); */
+        internal static readonly string TTSteamDir = Environment.CurrentDirectory;
+        
         // internal static readonly string TTSteamDir = @"E:/Steam/steamapps/common/TerraTech";
         private static readonly string QModsDir = Path.Combine(TTSteamDir, "QMods");
         private static readonly string WorkshopDir = Path.Combine(TTSteamDir, @"../../workshop/content/285920/");
+        private static readonly string ModListFileName = Path.Combine(TTSteamDir, "modlist.txt");
         internal const int DEFAULT_LOAD_ORDER = 10;
 
         internal static NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
@@ -56,6 +59,8 @@ namespace ModManager
         }
 
         internal static Harmony harmony = new Harmony(HarmonyID);
+
+        private static List<string> LoadedMods;
         
         private static List<WrappedMod> EarlyInitQueue;
         private static List<WrappedMod> InitQueue;
@@ -110,6 +115,63 @@ namespace ModManager
         {
             logger.Info("ModManager EarlyInit fired");
             Patch();
+        }
+
+        internal static void RequestConfiguredModSession()
+        {
+            if (File.Exists(ModListFileName))
+            {
+                System.IO.StreamReader file = new System.IO.StreamReader(ModListFileName);
+                string line;
+                while ((line = file.ReadLine()) != null)
+                {
+                    string[] array = line.Split(new char[] { ':' });
+                    if (array.Length == 2)
+                    {
+                        string modName = array[1];
+                        switch(array[0])
+                        {
+                            case "Local":
+                                LocalLoader.LoadLocalMod(modName);
+                                break;
+                            case "Workshop":
+                                if (ulong.TryParse(modName, out ulong workshopID)) {
+                                    PublishedFileId_t steamWorkshopID = new PublishedFileId_t(workshopID);
+                                    WorkshopLoader.m_WaitingOnDownloads.Add(steamWorkshopID);
+                                    WorkshopLoader.LoadWorkshopMod(new SteamDownloadItemData
+                                    {
+                                        m_Details = new SteamUGCDetails_t
+                                        {
+                                            m_nPublishedFileId = steamWorkshopID
+                                        }
+                                    },
+                                    true);
+                                    logger.Info("Loading workshop mod {WorkshopID}", workshopID);
+                                }
+                                else
+                                {
+                                    logger.Error("Attempted to load workshop mod with malformed ID {WorkshopID}", modName);
+                                }
+                                break;
+                            case "TTMM":
+                                logger.Error("Attempted to load mod {Mod} from TTMM. This is currently unsupported", modName);
+                                break;
+                            default:
+                                logger.Error("Found malformed mod request {Mod}", line);
+                                break;
+                        }
+                    }
+                    else
+                    {
+                        logger.Error("Found malformed mod request {Mod}", line);
+                    }
+                }
+                file.Close();
+            }
+            else
+            {
+                logger.Info("No mods requested");
+            }
         }
 
         public static void PatchAssemblyLoading()
