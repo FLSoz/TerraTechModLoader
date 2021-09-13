@@ -171,6 +171,17 @@ namespace ModManager
         {
         }
 
+        [HarmonyPatch(typeof(ManMods), "LoadWorkshopData")]
+        public static class PatchWorkshopLoad
+        {
+            [HarmonyPrefix]
+            public static bool Prefix(SteamDownloadItemData item, bool remote)
+            {
+                WorkshopLoader.LoadWorkshopData(item, remote);
+                return false;
+            }
+        }
+
         /* [HarmonyPatch(typeof(BlockUnlockTable), "AddModdedBlocks")]
         public static class PatchLogAddModdedBlocks
         {
