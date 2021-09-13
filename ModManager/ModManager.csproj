@@ -41,6 +41,10 @@
       <HintPath>..\..\..\..\Steam\steamapps\common\TerraTech\TerraTechWin64_Data\Managed\Assembly-CSharp.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <Reference Include="Assembly-CSharp-firstpass">
+      <HintPath>..\..\..\..\Steam\steamapps\common\TerraTech\TerraTechWin64_Data\Managed\Assembly-CSharp-firstpass.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
     <Reference Include="Newtonsoft.Json, Version=9.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\..\..\..\Steam\steamapps\common\TerraTech\TerraTechWin64_Data\Managed\Newtonsoft.Json.dll</HintPath>
@@ -88,6 +92,8 @@
     <Compile Include="src\Patches.cs" />
     <Compile Include="src\QMod.cs" />
     <Compile Include="src\QModInfo.cs" />
+    <Compile Include="src\ReflectedManMods.cs" />
+    <Compile Include="src\WorkshopLoader.cs" />
     <Compile Include="src\WrappedMod.cs" />
   </ItemGroup>
   <ItemGroup>

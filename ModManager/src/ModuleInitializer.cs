@@ -34,8 +34,8 @@ namespace ModManager
                 ModManager.PatchAssemblyLoading();
                 ModManager.Patch();
                 ModManager.logger.Info("Assembly Initialization Complete");
-                ModManager.ProcessUnofficialMods();
-                ModManager.logger.Info("Unofficial Mods Processed");
+                // ModManager.ProcessUnofficialMods();
+                // ModManager.logger.Info("Unofficial Mods Processed");
                 Inited = true;
             }
         }

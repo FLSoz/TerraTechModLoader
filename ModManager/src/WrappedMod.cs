@@ -3,22 +3,34 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Steamworks;
 
 namespace ModManager
 {
+    internal struct ModSource
+    {
+        public string ID;
+        public string Name;
+        public PublishedFileId_t WorkshopID;
+        public bool IsWorkshop;
+    }
+
     internal class WrappedMod
     {
         private IManagedMod managedMod = null;
         private ModBase officialMod = null;
+        public readonly ModSource source;
 
-        public WrappedMod(IManagedMod managedMod)
+        public WrappedMod(IManagedMod managedMod, ModSource source)
         {
             this.managedMod = managedMod;
+            this.source = source;
         }
 
-        public WrappedMod(ModBase officialMod)
+        public WrappedMod(ModBase officialMod, ModSource source)
         {
             this.officialMod = officialMod;
+            this.source = source;
         }
 
         public IManagedMod ManagedMod()

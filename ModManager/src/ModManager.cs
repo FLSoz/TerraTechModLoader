@@ -6,10 +6,10 @@ using System.Reflection;
 using System.Linq;
 using HarmonyLib;
 using NLog;
-
+using Steamworks;
 using ModManager.Datastructures;
-
 using LogManager;
+using Payload.UI.Commands.Steam;
 
 
 namespace ModManager
@@ -60,6 +60,9 @@ namespace ModManager
         private static List<WrappedMod> EarlyInitQueue;
         private static List<WrappedMod> InitQueue;
 
+        internal static Dictionary<ulong, SteamDownloadItemData> workshopMetadata = new Dictionary<ulong, SteamDownloadItemData>();
+        internal static Dictionary<Assembly, ModContainer> assemblyMetadata = new Dictionary<Assembly, ModContainer>();
+
         internal static Dictionary<Type, WrappedMod> managedMods = new Dictionary<Type, WrappedMod>();
         internal static Dictionary<string, QMod> unofficialMods = new Dictionary<string, QMod>();
         internal static QMod BlockInjector = null;
@@ -77,6 +80,7 @@ namespace ModManager
                 logger.Trace("Processing DeInit for mod {}", script.Name);
                 script.DeInit();
             }
+            assemblyMetadata.Clear();
         }
 
         internal static void Patch()
@@ -166,9 +170,6 @@ namespace ModManager
             }
         }
 
-        private static FieldInfo m_CurrentSession = typeof(ManMods).GetField("m_CurrentSession", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-        private static FieldInfo m_Mods = typeof(ManMods).GetField("m_Mods", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-
         private static List<WrappedMod> ProcessOrder(Func<IManagedMod, Type[]> getBefore, Func<IManagedMod, Type[]> getAfter)
         {
             DependencyGraph<Type> dependencies = new DependencyGraph<Type>();
@@ -252,6 +253,9 @@ namespace ModManager
             return null;
         }
 
+        /// <summary>
+        /// loads and processes TTQMM mods in order of defined dependencies
+        /// </summary>
         public static void ProcessUnofficialMods()
         {
             QMod.DefaultOrder = new Dictionary<string, int>{
@@ -347,6 +351,10 @@ namespace ModManager
             }
         }
 
+        /// <summary>
+        /// </summary>
+        /// <param name="span">time to be formatted</param>
+        /// <returns>time in 00h:00m:00s:00ms format</returns>
         private static string FormatTime(TimeSpan span)
         {
             string elapsedTime = "";
@@ -366,15 +374,93 @@ namespace ModManager
             return "Loaded in " + elapsedTime;
         }
 
+        /// <summary>
+        /// Handle loading of Assembly by specified ModContainer
+        /// </summary>
+        /// <param name="modContainer"></param>
+        /// <param name="assembly"></param>
+        private static void ProcessLoadAssembly(ModContainer modContainer, Assembly assembly)
+        {
+            ModContents contents = modContainer.Contents;
+            PublishedFileId_t workshopID = contents.m_WorkshopId;
+            bool isWorkshop = workshopID != PublishedFileId_t.Invalid;
+            string localString = isWorkshop ? "WORKSHOP" : "LOCAL";
+
+            logger.Debug("Processing assembly {Assembly}", assembly.FullName);
+
+            Type[] types = null;
+            try
+            {
+                types = assembly.GetExportedTypes();
+            }
+            catch (System.Reflection.ReflectionTypeLoadException ex)
+            {
+                logger.Error("Failed to get types for {Assembly} - assuming dependency failure and reloading", assembly.FullName);
+                Assembly reloadedAssembly = Assembly.Load(assembly.GetName());
+                types = reloadedAssembly.GetExportedTypes();
+            }
+
+            foreach (Type type in types)
+            {
+                logger.Trace("Type Found: {Type}", type.FullName);
+                if (typeof(ModBase).IsAssignableFrom(type) && !typeof(ModManager).IsAssignableFrom(type))
+                {
+                    ModSource source = new ModSource
+                    {
+                        ID = modContainer.ModID,
+                        Name = contents.ModName,
+                        IsWorkshop = isWorkshop,
+                        WorkshopID = workshopID
+                    };
+                    if (!managedMods.TryGetValue(type, out WrappedMod wrappedMod))
+                    {
+                        ManagedMod managedMod = ManagedMod.FromMod(type);
+                        if (!(managedMod is null))
+                        {
+                            logger.Debug("Located MANAGED {Local} mod {Script} in mod {Mod} ({ModId})",
+                                localString, type.Name, contents.ModName,
+                                isWorkshop ? modContainer.ModID + " - " + workshopID.ToString() : modContainer.ModID);
+                            wrappedMod = new WrappedMod(managedMod as IManagedMod, source);
+                        }
+                        else
+                        {
+                            logger.Debug("Located NON-MANAGED {Local} mod {Script} in mod {Mod} ({ModId})",
+                                localString, type.Name, contents.ModName,
+                                isWorkshop ? modContainer.ModID + " - " + workshopID.ToString() : modContainer.ModID);
+                            wrappedMod = new WrappedMod((Activator.CreateInstance(type) as ModBase), source);
+                        }
+                        managedMods.Add(type, wrappedMod);
+                        if (assembly.FullName.Contains("LegacyBlockLoader"))
+                        {
+                            LegacyBlockLoader = wrappedMod;
+                        }
+                    }
+                    else
+                    {
+                        logger.Debug("Located DUPLICATE {Local} mod {Script} in mod {Mod} ({ModId}). Using first loaded in {LoadedLocal} {LoadedMod} ({LoadedModId})",
+                            localString, type.Name, contents.ModName,
+                            isWorkshop ? modContainer.ModID + " - " + workshopID.ToString() : modContainer.ModID,
+                            wrappedMod.source.IsWorkshop ? "WORKSHOP" : "LOCAL", wrappedMod.source.Name,
+                            wrappedMod.source.IsWorkshop ? wrappedMod.source.ID + " - " + wrappedMod.source.WorkshopID.ToString() : wrappedMod.source.ID);
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Handle processing of all Official mods. Will detect everything in the mod list, determine dependency relationships based on reflection, and setup the load queue.
+        /// </summary>
+        /// <remarks>Assumes that all script mods have been loaded correctly (no bad .dll errors)</remarks>
         public static void ReprocessOfficialMods()
         {
             EarlyInitQueue = new List<WrappedMod>();
             InitQueue = new List<WrappedMod>();
 
             managedMods.Clear();
+            assemblyMetadata.Clear();
 
-            ModSessionInfo session = (ModSessionInfo) m_CurrentSession.GetValue(Singleton.Manager<ManMods>.inst);
-            Dictionary<string, ModContainer> mods = (Dictionary<string, ModContainer>) m_Mods.GetValue(Singleton.Manager<ManMods>.inst);
+            ModSessionInfo session = (ModSessionInfo) ReflectedManMods.m_CurrentSession.GetValue(Singleton.Manager<ManMods>.inst);
+            Dictionary<string, ModContainer> mods = (Dictionary<string, ModContainer>)ReflectedManMods.m_Mods.GetValue(Singleton.Manager<ManMods>.inst);
 
             // Clear out any and all script mods that are present
             logger.Info("Reprocessing all mods in session");
@@ -384,13 +470,15 @@ namespace ModManager
                 if (mods.TryGetValue(key, out modContainer) && modContainer != null)
                 {
                     ModContents contents = modContainer.Contents;
+
+                    // This bit of code should never be run on a normal setup (Local mod)
+                    // This will null the script parts of any mods, if mod manager is loaded after them.
+                    // Should only happen in case of Multiplayer
                     ModBase script = modContainer.Script;
                     if (script != null && !(script is ModManager))
                     {
                         contents.Script = null;
                     }
-
-                    string localString = modContainer.IsRemote ? "WORKSHOP" : "LOCAL";
 
                     foreach (FileInfo fileInfo in Directory.GetParent(modContainer.AssetBundlePath).EnumerateFiles())
                     {
@@ -398,43 +486,21 @@ namespace ModManager
                         if (fileInfo.Extension == ".dll" && !fileInfo.Name.Contains("ModManager"))
                         {
                             Assembly assembly = Assembly.LoadFrom(fileInfo.FullName);
-                            logger.Debug("Processing assembly {Assembly}", assembly.FullName);
 
-                            Type[] types = null;
-                            try
+                            if (assemblyMetadata.TryGetValue(assembly, out ModContainer existingMod))
                             {
-                                types = assembly.GetExportedTypes();
+                                logger.Debug("Attempting to load assembly {Assembly} as part of Mod {Mod} ({ModID} - {ModLocal}), but assembly is already loaded by mod {ExistingMod} ({ExistingModID} - {ExistingModLocal})",
+                                    assembly.FullName,
+                                    modContainer.Contents.ModName, modContainer.ModID,
+                                    modContainer.Contents.m_WorkshopId != PublishedFileId_t.Invalid ? modContainer.Contents.m_WorkshopId.ToString() : "LOCAL",
+                                    existingMod.Contents.ModName, existingMod.ModID,
+                                    existingMod.Contents.m_WorkshopId != PublishedFileId_t.Invalid ? existingMod.Contents.m_WorkshopId.ToString() : "LOCAL"
+                                );
                             }
-                            catch (System.Reflection.ReflectionTypeLoadException ex)
+                            else
                             {
-                                logger.Error("Failed to get types for {Assembly} - assuming dependency failure and reloading", assembly.FullName);
-                                Assembly reloadedAssembly = Assembly.Load(assembly.GetName());
-                                types = reloadedAssembly.GetExportedTypes();
-                            }
-
-                            foreach (Type type in types)
-                            {
-                                logger.Trace("Type Found: {Type}", type.FullName);
-                                if (typeof(ModBase).IsAssignableFrom(type) && !typeof(ModManager).IsAssignableFrom(type))
-                                {
-                                    ManagedMod managedMod = ManagedMod.FromMod(type);
-                                    WrappedMod wrappedMod;
-                                    if (!(managedMod is null))
-                                    {
-                                        logger.Debug("Located MANAGED {Local} script mod {Script} in mod {Mod} ({ModId})", localString, type.Name, contents.ModName, modContainer.ModID);
-                                        wrappedMod = new WrappedMod(managedMod as IManagedMod);
-                                    }
-                                    else
-                                    {
-                                        logger.Debug("Located NON-MANAGED {Local} script mod {Script} in mod {Mod} ({ModId})", localString, type.Name, contents.ModName, modContainer.ModID);
-                                        wrappedMod = new WrappedMod((Activator.CreateInstance(type) as ModBase));
-                                    }
-                                    managedMods.Add(type, wrappedMod);
-                                    if (assembly.FullName.Contains("LegacyBlockLoader"))
-                                    {
-                                        LegacyBlockLoader = wrappedMod;
-                                    }
-                                }
+                                assemblyMetadata.Add(assembly, modContainer);
+                                ProcessLoadAssembly(modContainer, assembly);
                             }
                         }
                     }
@@ -495,26 +561,6 @@ namespace ModManager
             Patch.Invoke(null, new object[] { blockInjectorHarmony });
             logger.Debug("Patched OfficialBlocks");
             #endregion
-
-            /*
-            #region TankPrefabPatch
-            IEnumerable<Type> types = Patches.GetNestedTypes(BindingFlags.Static | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-            foreach (Type type in types)
-            {
-                logger.Trace("Found type {type}", type.ToString());
-            }
-            Type TankPrefabPatch = types.Where(type => type.Name == "TankPrefabPatch").First();
-            logger.Trace("Getting TankPatch method");
-            MethodInfo TankPatch = TankPrefabPatch.GetMethod(
-                "Prefix",
-                    BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic,
-                    null,
-                    new Type[] { typeof(ManSpawn).MakeByRefType() },
-                    null
-            );
-            TankPatch.Invoke(null, new object[] { Singleton.Manager<ManSpawn>.inst });
-            #endregion
-            */
 
             #region Miscellaneous Patches
             try
