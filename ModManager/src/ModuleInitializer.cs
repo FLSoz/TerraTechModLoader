@@ -38,7 +38,6 @@ namespace ModManager
                 // ModManager.logger.Info("Unofficial Mods Processed");
 
                 ModManager.RequestConfiguredModSession();
-                ModManager.logger.Info("Custom mod session requested");
 
                 Inited = true;
             }

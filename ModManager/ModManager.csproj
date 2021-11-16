@@ -89,6 +89,7 @@
     <Compile Include="src\datastructures\DependencyGraph.cs" />
     <Compile Include="src\datastructures\PriorityQueue.cs" />
     <Compile Include="src\IManagedMod.cs" />
+    <Compile Include="src\LocalLoader.cs" />
     <Compile Include="src\ManagedMod.cs" />
     <Compile Include="src\ModConfig.cs" />
     <Compile Include="src\ModManager.cs" />

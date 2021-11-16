@@ -119,23 +119,27 @@ namespace ModManager
 
         internal static void RequestConfiguredModSession()
         {
-            if (File.Exists(ModListFileName))
+            string argument = CommandLineReader.GetArgument("+ttsmm_mod_list");
+            if (argument != null)
             {
-                System.IO.StreamReader file = new System.IO.StreamReader(ModListFileName);
-                string line;
-                while ((line = file.ReadLine()) != null)
+                logger.Info("Found custom TTSMM mod list");
+                string[] mods = argument.Split(new char[] { ',' });
+                foreach (string mod in mods)
                 {
-                    string[] array = line.Split(new char[] { ':' });
-                    if (array.Length == 2)
+                    string trimmedMod = mod.Trim(new char[] { '[', ']', ' ' });
+                    string[] modDescrip = trimmedMod.Split(new char[] { ':' });
+                    if (modDescrip.Length == 2)
                     {
-                        string modName = array[1];
-                        switch(array[0])
+                        string type = modDescrip[0];
+                        string modName = modDescrip[1];
+                        switch(type)
                         {
                             case "Local":
                                 LocalLoader.LoadLocalMod(modName);
                                 break;
                             case "Workshop":
-                                if (ulong.TryParse(modName, out ulong workshopID)) {
+                                if (ulong.TryParse(modName, out ulong workshopID))
+                                {
                                     PublishedFileId_t steamWorkshopID = new PublishedFileId_t(workshopID);
                                     WorkshopLoader.m_WaitingOnDownloads.Add(steamWorkshopID);
                                     WorkshopLoader.LoadWorkshopMod(new SteamDownloadItemData
@@ -157,20 +161,15 @@ namespace ModManager
                                 logger.Error("Attempted to load mod {Mod} from TTMM. This is currently unsupported", modName);
                                 break;
                             default:
-                                logger.Error("Found malformed mod request {Mod}", line);
+                                logger.Error("Found malformed mod request {Mod}", trimmedMod);
                                 break;
                         }
                     }
-                    else
-                    {
-                        logger.Error("Found malformed mod request {Mod}", line);
-                    }
                 }
-                file.Close();
             }
             else
             {
-                logger.Info("No mods requested");
+                logger.Info("No custom mod list found - no mods will be loaded if game was launched via TTSMM, will get normal mod loading behaviour otherwise");
             }
         }
 
