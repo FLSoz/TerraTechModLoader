@@ -32,6 +32,7 @@ namespace ModManager
         private static bool patchedAssemblyLoading = false;
         private static bool patched = false;
         internal const string HarmonyID = "com.flsoz.ttmodding.modmanager";
+        internal static PublishedFileId_t WorkshopID = new PublishedFileId_t(2655051786);
 
         /* internal static readonly string TTSteamDir = Path.GetFullPath(Path.Combine(
             AppDomain.CurrentDomain.GetAssemblies()
@@ -47,7 +48,7 @@ namespace ModManager
         internal const int DEFAULT_LOAD_ORDER = 10;
 
         internal static NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
-        internal static void ConfigureLogger()
+        public static void ConfigureLogger()
         {
             Manager.LogConfig config = new Manager.LogConfig
             {
@@ -122,42 +123,54 @@ namespace ModManager
             string argument = CommandLineReader.GetArgument("+ttsmm_mod_list");
             if (argument != null)
             {
-                logger.Info("Found custom TTSMM mod list");
+                logger.Info($"Found custom TTSMM mod list: {argument}");
                 string[] mods = argument.Split(new char[] { ',' });
                 foreach (string mod in mods)
                 {
+                    logger.Info($"Processing mod {mod}");
                     string trimmedMod = mod.Trim(new char[] { '[', ']', ' ' });
                     string[] modDescrip = trimmedMod.Split(new char[] { ':' });
                     if (modDescrip.Length == 2)
                     {
                         string type = modDescrip[0];
                         string modName = modDescrip[1];
-                        switch(type)
+                        logger.Info($"Mod ({modName}) determined to be of type {type}");
+                        switch (type)
                         {
-                            case "Local":
+                            case "local":
                                 LocalLoader.LoadLocalMod(modName);
                                 break;
-                            case "Workshop":
+                            case "workshop":
                                 if (ulong.TryParse(modName, out ulong workshopID))
                                 {
                                     PublishedFileId_t steamWorkshopID = new PublishedFileId_t(workshopID);
-                                    WorkshopLoader.m_WaitingOnDownloads.Add(steamWorkshopID);
-                                    WorkshopLoader.LoadWorkshopMod(new SteamDownloadItemData
+                                    if (steamWorkshopID != WorkshopID)
                                     {
-                                        m_Details = new SteamUGCDetails_t
+                                        ManMods manager = Singleton.Manager<ManMods>.inst;
+                                        List<PublishedFileId_t> m_WaitingOnDownloads = (List<PublishedFileId_t>)ReflectedManMods.m_WaitingOnDownloads.GetValue(manager);
+                                        m_WaitingOnDownloads.Add(steamWorkshopID);
+                                        WorkshopLoader.LoadWorkshopMod(new SteamDownloadItemData
                                         {
-                                            m_nPublishedFileId = steamWorkshopID
-                                        }
-                                    },
-                                    true);
-                                    logger.Info("Loading workshop mod {WorkshopID}", workshopID);
+                                            m_Details = new SteamUGCDetails_t
+                                            {
+                                                m_nPublishedFileId = steamWorkshopID
+                                            }
+                                        },
+                                        false);
+                                        // We enforce that this is not remote
+                                        logger.Info("Loading workshop mod {WorkshopID}", workshopID);
+                                    }
+                                    else
+                                    {
+                                        logger.Info("Requested self - ignoring");
+                                    }
                                 }
                                 else
                                 {
                                     logger.Error("Attempted to load workshop mod with malformed ID {WorkshopID}", modName);
                                 }
                                 break;
-                            case "TTMM":
+                            case "ttqmm":
                                 logger.Error("Attempted to load mod {Mod} from TTMM. This is currently unsupported", modName);
                                 break;
                             default:
@@ -435,6 +448,8 @@ namespace ModManager
             return "Loaded in " + elapsedTime;
         }
 
+        private static string[] KNOWN_ASSEMBLIES = { "0Harmony", "NLog", "LogManager", "ModManager" };
+
         /// <summary>
         /// Handle loading of Assembly by specified ModContainer
         /// </summary>
@@ -463,7 +478,10 @@ namespace ModManager
 
             foreach (Type type in types)
             {
-                logger.Trace("Type Found: {Type}", type.FullName);
+                if (!KNOWN_ASSEMBLIES.ToList().Contains(assembly.GetName().Name)) {
+                    logger.Trace("Type Found: {Type}", type.FullName);
+                }
+
                 if (typeof(ModBase).IsAssignableFrom(type) && !typeof(ModManager).IsAssignableFrom(type))
                 {
                     ModSource source = new ModSource

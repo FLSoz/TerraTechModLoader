@@ -12,12 +12,11 @@ namespace ModManager
 {
     internal static class WorkshopLoader
     {
-		internal static readonly ManMods manager = Singleton.Manager<ManMods>.inst;
-		internal static readonly Dictionary<string, ModContainer> mods = (Dictionary<string, ModContainer>)ReflectedManMods.m_Mods.GetValue(manager);
-		internal static readonly List<PublishedFileId_t> m_WaitingOnDownloads = (List<PublishedFileId_t>)ReflectedManMods.m_WaitingOnDownloads.GetValue(manager);
-
 		internal static void OnDownloadComplete(SteamDownloadItemData result, bool remote)
 		{
+			ManMods manager = Singleton.Manager<ManMods>.inst;
+			Dictionary<string, ModContainer> mods = (Dictionary<string, ModContainer>)ReflectedManMods.m_Mods.GetValue(manager);
+			List<PublishedFileId_t> m_WaitingOnDownloads = (List<PublishedFileId_t>)ReflectedManMods.m_WaitingOnDownloads.GetValue(manager);
 			string text = result.m_FileInfo.Name;
 			if (text.EndsWith("_bundle"))
 			{
@@ -67,6 +66,8 @@ namespace ModManager
 
 		internal static void OnDownloadCancelled(SteamDownloadItemData result, SteamDownloadItemData item)
 		{
+			ManMods manager = Singleton.Manager<ManMods>.inst;
+			List<PublishedFileId_t> m_WaitingOnDownloads = (List<PublishedFileId_t>)ReflectedManMods.m_WaitingOnDownloads.GetValue(manager);
 			ModManager.logger.Error("Downloading file {SteamID} from workshop failed", item.m_Details.m_nPublishedFileId);
 			m_WaitingOnDownloads.Remove(result.m_Details.m_nPublishedFileId);
 			Singleton.Manager<ManNetworkLobby>.inst.LeaveLobby();
