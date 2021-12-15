@@ -183,6 +183,8 @@ namespace ModManager
             else
             {
                 logger.Info("No custom mod list found - no mods will be loaded if game was launched via TTSMM, will get normal mod loading behaviour otherwise");
+                ProcessUnofficialMods();
+                logger.Info("Unofficial Mods Processed");
             }
         }
 

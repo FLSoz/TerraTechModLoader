@@ -32,8 +32,6 @@ internal static class ModuleInitializer
             ModManager.ModManager.PatchAssemblyLoading();
             ModManager.ModManager.Patch();
             ModManager.ModManager.logger.Info("Assembly Initialization Complete");
-            // ModManager.ProcessUnofficialMods();
-            // ModManager.logger.Info("Unofficial Mods Processed");
 
             ModManager.ModManager.RequestConfiguredModSession();
 
