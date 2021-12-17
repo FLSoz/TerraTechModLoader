@@ -16,24 +16,24 @@ internal static class ModuleInitializer
         Console.WriteLine("HELLO WORLD");
         if (!Inited)
         {
-            /* foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies()) {
-                Console.WriteLine($"ASSEMBLY CURRENTLY LOADED: {assembly.FullName}");
-            } */
-
             // Assembly currentAssembly = Assembly.GetExecutingAssembly();
             // Configure all loggers
-            Harmony.DEBUG = true;
+            // Harmony.DEBUG = true;
             ModManager.ModManager.ConfigureLogger();
             ModManager.QMod.ConfigureLogger();
             DependencyGraph<ModManager.QMod>.ConfigureLogger();
             DependencyGraph<Type>.ConfigureLogger();
 
-            // TODO: Add assembly initialization logic.
             ModManager.ModManager.PatchAssemblyLoading();
+            // TODO: Add assembly initialization logic.
             ModManager.ModManager.Patch();
             ModManager.ModManager.logger.Info("Assembly Initialization Complete");
 
-            ModManager.ModManager.RequestConfiguredModSession();
+            // Only handle session requests if loaded via TTSMM. Otherwise, do nothing
+            if (CommandLineReader.GetArgument("+custom_mod_list") != null)
+            {
+                ModManager.ModManager.RequestConfiguredModSession();
+            }
 
             Inited = true;
         }

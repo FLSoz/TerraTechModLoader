@@ -34,12 +34,11 @@ namespace ModManager
         internal const string HarmonyID = "com.flsoz.ttmodding.modmanager";
         internal static PublishedFileId_t WorkshopID = new PublishedFileId_t(2655051786);
 
-        /* internal static readonly string TTSteamDir = Path.GetFullPath(Path.Combine(
+        internal static readonly string TTSteamDir = Path.GetFullPath(Path.Combine(
             AppDomain.CurrentDomain.GetAssemblies()
             .Where(assembly => assembly.GetName().Name == "Assembly-CSharp").First().Location
             .Replace("Assembly-CSharp.dll", ""), @"../../"
-        )); */
-        internal static readonly string TTSteamDir = Environment.CurrentDirectory;
+        ));
         
         // internal static readonly string TTSteamDir = @"E:/Steam/steamapps/common/TerraTech";
         private static readonly string QModsDir = Path.Combine(TTSteamDir, "QMods");
@@ -182,9 +181,12 @@ namespace ModManager
             }
             else
             {
-                logger.Info("No custom mod list found - no mods will be loaded if game was launched via TTSMM, will get normal mod loading behaviour otherwise");
-                ProcessUnofficialMods();
-                logger.Info("Unofficial Mods Processed");
+                // We explicitly loaded only this mod. 
+
+                logger.Info("No custom mod list found - getting default mod loading behaviour");
+                ManMods manMods = Singleton.Manager<ManMods>.inst;
+                typeof(ManMods).GetMethod("CheckForLocalMods", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public).Invoke(manMods, null);
+                typeof(ManMods).GetMethod("CheckForSteamWorkshopMods", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public).Invoke(manMods, null);
             }
         }
 

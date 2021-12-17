@@ -78,7 +78,12 @@ namespace ModManager
             {
                 if (this.officialMod.HasEarlyInit())
                 {
+                    ModManager.logger.Info("Running EarlyInit for Mod {Mod}", Name);
                     this.officialMod.EarlyInit();
+                }
+                else
+                {
+                    ModManager.logger.Info("Mod {Mod} has no EarlyInit", Name);
                 }
             }
         }
