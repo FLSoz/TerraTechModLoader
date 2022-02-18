@@ -46,14 +46,14 @@ namespace ModManager
         private static readonly string ModListFileName = Path.Combine(TTSteamDir, "modlist.txt");
         internal const int DEFAULT_LOAD_ORDER = 10;
 
-        internal static NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
+        internal static NLog.Logger logger = NLog.LogManager.GetLogger("ModManager");
         public static void ConfigureLogger()
         {
             Manager.LogConfig config = new Manager.LogConfig
             {
                 layout = "${longdate} | ${level:uppercase=true:padding=-5:alignmentOnTruncation=left} | ${logger:shortName=true} | ${message}  ${exception}",
                 keepOldFiles = false,
-                minLevel = LogLevel.Trace
+                defaultMinLevel = LogLevel.Trace
             };
             Manager.RegisterLogger(logger, config);
         }
@@ -250,53 +250,65 @@ namespace ModManager
 
         private static List<WrappedMod> ProcessOrder(Func<IManagedMod, Type[]> getBefore, Func<IManagedMod, Type[]> getAfter)
         {
+            ModSessionInfo session = (ModSessionInfo)ReflectedManMods.m_CurrentSession.GetValue(Singleton.Manager<ManMods>.inst);
+            Dictionary<string, ModContainer> mods = (Dictionary<string, ModContainer>)ReflectedManMods.m_Mods.GetValue(Singleton.Manager<ManMods>.inst);
             DependencyGraph<Type> dependencies = new DependencyGraph<Type>();
             // add nodes
             foreach (KeyValuePair<Type, WrappedMod> entry in ModManager.managedMods)
             {
-                dependencies.AddNode(new DependencyGraph<Type>.Node {
-                    value = entry.Key,
-                    order = entry.Value.LoadOrder
-                });
+                // Only process currently active mods (in the session)
+                string modID = entry.Value.ModID;
+                if (mods.ContainsKey(modID))
+                {
+                    dependencies.AddNode(new DependencyGraph<Type>.Node
+                    {
+                        value = entry.Key,
+                        order = entry.Value.LoadOrder
+                    });
+                }
             }
             // add edges
             foreach (KeyValuePair<Type, WrappedMod> entry in ModManager.managedMods)
             {
+                // Only process currently active mods (in the session)
                 WrappedMod mod = entry.Value;
-                IManagedMod managedMod;
-                if (!((managedMod = mod.ManagedMod()) is null))
+                if (mods.ContainsKey(mod.ModID))
                 {
-                    logger.Debug("Processing edges for {Mod}", managedMod.Name);
-                    Type[] loadBefore = getBefore(managedMod);
-                    if (loadBefore != null && loadBefore.Length > 0)
+                    IManagedMod managedMod;
+                    if (!((managedMod = mod.ManagedMod()) is null))
                     {
-                        logger.Debug("  Found LoadBefore Targets: {Targets}", loadBefore);
-                        foreach (Type target in loadBefore)
+                        logger.Debug("Processing edges for {Mod}", managedMod.Name);
+                        Type[] loadBefore = getBefore(managedMod);
+                        if (loadBefore != null && loadBefore.Length > 0)
                         {
-                            try
+                            logger.Debug("  Found LoadBefore Targets: {Targets}", loadBefore);
+                            foreach (Type target in loadBefore)
                             {
-                                dependencies.AddEdge(target, entry.Key);
-                            }
-                            catch (Exception ex)
-                            {
-                                logger.Error(ex, "Unable to set constraint to load {mod} before {target}", mod.Name, target.Name);
+                                try
+                                {
+                                    dependencies.AddEdge(target, entry.Key);
+                                }
+                                catch (Exception ex)
+                                {
+                                    logger.Error(ex, "Unable to set constraint to load {mod} before {target}", mod.Name, target.Name);
+                                }
                             }
                         }
-                    }
 
-                    Type[] loadAfter = getAfter(managedMod);
-                    if (loadAfter != null && loadAfter.Length > 0)
-                    {
-                        logger.Debug("  Found LoadAfter Targets: {Targets}", loadAfter);
-                        foreach (Type target in loadAfter)
+                        Type[] loadAfter = getAfter(managedMod);
+                        if (loadAfter != null && loadAfter.Length > 0)
                         {
-                            try
+                            logger.Debug("  Found LoadAfter Targets: {Targets}", loadAfter);
+                            foreach (Type target in loadAfter)
                             {
-                                dependencies.AddEdge(entry.Key, target);
-                            }
-                            catch (Exception ex)
-                            {
-                                logger.Error(ex, "Unable to set constraint to load {mod} after {target}", mod.Name, target.Name);
+                                try
+                                {
+                                    dependencies.AddEdge(entry.Key, target);
+                                }
+                                catch (Exception ex)
+                                {
+                                    logger.Error(ex, "Unable to set constraint to load {mod} after {target}", mod.Name, target.Name);
+                                }
                             }
                         }
                     }
@@ -512,6 +524,7 @@ namespace ModManager
                                 isWorkshop ? modContainer.ModID + " - " + workshopID.ToString() : modContainer.ModID);
                             wrappedMod = new WrappedMod((Activator.CreateInstance(type) as ModBase), source);
                         }
+                        wrappedMod.ModID = modContainer.ModID;
                         managedMods.Add(type, wrappedMod);
                         if (assembly.FullName.Contains("LegacyBlockLoader"))
                         {
@@ -520,7 +533,7 @@ namespace ModManager
                     }
                     else
                     {
-                        logger.Debug("Located DUPLICATE {Local} mod {Script} in mod {Mod} ({ModId}). Using first loaded in {LoadedLocal} {LoadedMod} ({LoadedModId})",
+                        logger.Debug("Already processed {Local} mod {Script} in mod {Mod} ({ModId}). Using first loaded in {LoadedLocal} {LoadedMod} ({LoadedModId})",
                             localString, type.Name, contents.ModName,
                             isWorkshop ? modContainer.ModID + " - " + workshopID.ToString() : modContainer.ModID,
                             wrappedMod.source.IsWorkshop ? "WORKSHOP" : "LOCAL", wrappedMod.source.Name,
@@ -539,7 +552,6 @@ namespace ModManager
             EarlyInitQueue = new List<WrappedMod>();
             InitQueue = new List<WrappedMod>();
 
-            managedMods.Clear();
             assemblyMetadata.Clear();
 
             ModSessionInfo session = (ModSessionInfo) ReflectedManMods.m_CurrentSession.GetValue(Singleton.Manager<ManMods>.inst);
@@ -704,8 +716,12 @@ namespace ModManager
             logger.Info("Processing Early Inits");
             foreach (WrappedMod script in EarlyInitQueue)
             {
-                logger.Trace("Processing EarlyInit for mod {}", script.Name);
-                script.EarlyInit();
+                if (!script.earlyInitRun)
+                {
+                    logger.Trace("Processing EarlyInit for mod {}", script.Name);
+                    script.EarlyInit();
+                    script.earlyInitRun = true;
+                }
             }
         }
 

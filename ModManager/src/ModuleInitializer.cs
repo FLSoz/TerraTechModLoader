@@ -29,10 +29,21 @@ internal static class ModuleInitializer
             ModManager.ModManager.Patch();
             ModManager.ModManager.logger.Info("Assembly Initialization Complete");
 
-            // Only handle session requests if loaded via TTSMM. Otherwise, do nothing
+            // Only handle session requests if loaded via TTSMM. Otherwise, proceed as normal
             if (CommandLineReader.GetArgument("+custom_mod_list") != null)
             {
                 ModManager.ModManager.RequestConfiguredModSession();
+            }
+            else
+            {
+                string[] commandLineArgs = CommandLineReader.GetCommandLineArgs();
+                for (int i = 0; i < commandLineArgs.Length; i++)
+                {
+                    if (commandLineArgs[i] == "+manage_ttmm")
+                    {
+                        ModManager.ModManager.ProcessUnofficialMods();
+                    }
+                }
             }
 
             Inited = true;

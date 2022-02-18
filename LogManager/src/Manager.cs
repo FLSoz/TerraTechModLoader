@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Linq;
+using System.Collections.Generic;
 using System.Reflection;
 using System.IO;
 using NLog;
 using NLog.Config;
+using NLog.Targets;
 
 
 namespace LogManager
@@ -19,37 +21,141 @@ namespace LogManager
         // internal static readonly string TTSteamDir = @"E:/Steam/steamapps/common/TerraTech";
         private static readonly string LogsDir = Path.Combine(TTSteamDir, "Logs");
 
+        internal static Dictionary<string, LogLevel> ConfiguredLogLevels = new Dictionary<string, LogLevel>();
+        internal static LogLevel ConfiguredGlobalLogLevel = null;
+
+        // LogConfig - for when you only need a single output file for the logger
         public struct LogConfig
         {
             public string path;
             public string layout;
-            public LogLevel minLevel;
+            public LogLevel defaultMinLevel;
             public bool keepOldFiles;
+        }
+
+        // Target config - defines a target file for logging
+        public struct TargetConfig
+        {
+            public string path;
+            public string layout;
+            public bool keepOldFiles;
+        }
+
+        public struct LogTarget
+        {
+            public FileTarget logFile;
+            public TargetConfig config;
+        }
+
+        internal static string GetRelativePath(string logPath, string basePath)
+        {
+            string fullLogPath = Path.GetFullPath(logPath);
+            string fullBasePath = Path.GetFullPath(basePath);
+
+            int index = 0;
+            int maxlen = Math.Min(fullBasePath.Length, fullLogPath.Length);
+            for (int i = 0; i < maxlen; i++)
+            {
+                if (fullLogPath[i] != fullBasePath[i])
+                {
+                    index = i;
+                    break;
+                }
+            }
+            return logPath.Substring(index);
+        }
+
+        public static LogTarget RegisterLoggingTarget(string targetName, TargetConfig targetConfig)
+        {
+            string shortTargetName = targetName.Substring(targetName.LastIndexOf('.') + 1);
+
+            Console.WriteLine($"[LogManager] Registering logger {targetName}");
+
+            string fullPath = targetConfig.path;
+            if (fullPath is null || fullPath.Length == 0)
+            {
+                fullPath = Path.Combine(LogsDir, $"{shortTargetName}.log");
+            }
+            else if (fullPath.Contains(LogsDir))
+            {
+                // Assume this is a full path already
+                if (!fullPath.EndsWith(".log"))
+                {
+                    fullPath = Path.Combine(fullPath, $"{shortTargetName}.log");
+                }
+            }
+            else if (!fullPath.EndsWith(".log"))
+            {
+                fullPath = Path.Combine(LogsDir, fullPath, $"{shortTargetName}.log");
+            }
+            else
+            {
+                fullPath = Path.Combine(LogsDir, fullPath);
+            }
+
+            return new LogTarget {
+                logFile = new FileTarget($"logfile-{targetConfig.path}")
+                {
+                    FileName = fullPath,
+                    Layout = targetConfig.layout is null || targetConfig.layout.Length == 0 ?
+                        "${longdate} | ${level:uppercase=true:padding=-5:alignmentOnTruncation=left} | ${logger:shortName=true} | ${message}  ${exception}" :
+                        targetConfig.layout,
+                    EnableFileDelete = false,
+                    DeleteOldFileOnStartup = false
+                },
+                config = new TargetConfig
+                {
+                    path = fullPath,
+                    layout = targetConfig.layout,
+                    keepOldFiles = targetConfig.keepOldFiles
+                }
+            };
+        }
+
+        public static void RegisterLogger(Logger logger, LogTarget target, LogLevel defaultMinLevel = null)
+        {
+            // Manually handle deletion ourselves, or the ModManager log will constantly get reset
+            if (!target.config.keepOldFiles)
+            {
+                if (File.Exists(target.config.path))
+                {
+                    File.Delete(target.config.path);
+                }
+            }
+
+            LogLevel minLevel = defaultMinLevel is null ? LogLevel.Debug : defaultMinLevel;
+
+            if (ConfiguredLogLevels.TryGetValue(logger.Name, out LogLevel configuredLevel))
+            {
+                minLevel = configuredLevel;
+            }
+            else
+            {
+                string shortLoggerName = logger.Name.Substring(logger.Name.LastIndexOf('.') + 1);
+                if (ConfiguredLogLevels.TryGetValue(shortLoggerName, out configuredLevel) && configuredLevel != null)
+                {
+                    minLevel = configuredLevel;
+                }
+                else if (ConfiguredGlobalLogLevel != null)
+                {
+                    minLevel = ConfiguredGlobalLogLevel;
+                }
+            }
+
+            config.AddRule(minLevel, LogLevel.Fatal, target.logFile, logger.Name);
+            NLog.LogManager.Configuration = config;
         }
 
         public static void RegisterLogger(Logger logger, LogConfig logConfig)
         {
-            string loggerName = logger.Name;
-            string shortLoggerName = loggerName.Substring(loggerName.LastIndexOf('.') + 1);
-            string path = logConfig.path;
-            if (path is null || path.Length == 0)
+            TargetConfig generatedConfig = new TargetConfig
             {
-                path = Path.Combine(LogsDir, $"{shortLoggerName}.log");
-            }
-
-            // Targets where to log to: File and Console
-            var logfile = new NLog.Targets.FileTarget($"logfile-{loggerName}")
-            {
-                FileName = path,
-                Layout = logConfig.layout is null || logConfig.layout.Length == 0 ?
-                    "${longdate} | ${level:uppercase=true:padding=-5:alignmentOnTruncation=left} | ${logger:shortName=true} | ${message}  ${exception}" :
-                    logConfig.layout,
-                EnableFileDelete = logConfig.keepOldFiles ? false : true,
-                DeleteOldFileOnStartup = logConfig.keepOldFiles ? false : true
+                path = logConfig.path,
+                layout = logConfig.layout,
+                keepOldFiles = logConfig.keepOldFiles
             };
-
-            Manager.config.AddRule(logConfig.minLevel is null ? LogLevel.Debug : logConfig.minLevel, LogLevel.Fatal, logfile, loggerName);
-            NLog.LogManager.Configuration = Manager.config;
+            LogTarget logTarget = RegisterLoggingTarget(logger.Name, generatedConfig);
+            RegisterLogger(logger, logTarget);
         }
     }
 }

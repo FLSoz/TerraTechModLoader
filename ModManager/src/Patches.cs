@@ -24,6 +24,8 @@ namespace ModManager
         [HarmonyPatch(typeof(ManMods), "InitModScripts")]
         public static class PatchModScriptLoading
         {
+            private static bool firstPass = false;
+
             [HarmonyPrefix]
             public static bool Prefix()
             {
