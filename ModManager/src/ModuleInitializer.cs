@@ -13,12 +13,11 @@ internal static class ModuleInitializer
 
     internal static void Run()
     {
-        Console.WriteLine("HELLO WORLD");
         if (!Inited)
         {
-            // Assembly currentAssembly = Assembly.GetExecutingAssembly();
+            Console.WriteLine("[0ModManager] Initializing manager...");
+
             // Configure all loggers
-            // Harmony.DEBUG = true;
             ModManager.ModManager.ConfigureLogger();
             ModManager.QMod.ConfigureLogger();
             DependencyGraph<ModManager.QMod>.ConfigureLogger();
@@ -42,6 +41,10 @@ internal static class ModuleInitializer
                     if (commandLineArgs[i] == "+manage_ttmm")
                     {
                         ModManager.ModManager.ProcessUnofficialMods();
+                    }
+                    else if (commandLineArgs[i] == "+harmony_debug")
+                    {
+                        Harmony.DEBUG = true;
                     }
                 }
             }

@@ -45,9 +45,9 @@ namespace LogManager
                         {
                             Manager.ConfiguredGlobalLogLevel = LogLevel.FromString(argValue);
                         }
-                        else
+                        else if (arg[10] == '_')
                         {
-                            string loggerName = arg.Substring(10);
+                            string loggerName = arg.Substring(11);
                             Manager.ConfiguredLogLevels.Add(loggerName, LogLevel.FromString(argValue));
                         }
                     }
