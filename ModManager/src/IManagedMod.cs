@@ -9,6 +9,11 @@ namespace ModManager
 {
     public interface IManagedMod
     {
+        ModBase instance
+        {
+            get;
+        }
+
         int loadOrder
         {
             get;

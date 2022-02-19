@@ -9,7 +9,12 @@ namespace ModManager
 {
     internal class ManagedMod : IManagedMod
     {
-        private ModBase instance;
+        private ModBase _instance;
+        public ModBase instance {
+            get => this._instance;
+            private set => this._instance = value;
+        }
+
         private Type instanceType;
         private int _LoadOrder;
 

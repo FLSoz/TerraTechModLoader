@@ -40,6 +40,7 @@ internal static class ModuleInitializer
                 {
                     if (commandLineArgs[i] == "+manage_ttmm")
                     {
+                        ModManager.ModManager.EnableTTQMMHandling = true;
                         ModManager.ModManager.ProcessUnofficialMods();
                     }
                     else if (commandLineArgs[i] == "+harmony_debug")

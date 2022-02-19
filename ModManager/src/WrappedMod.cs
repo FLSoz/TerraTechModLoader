@@ -18,7 +18,7 @@ namespace ModManager
     internal class WrappedMod
     {
         private IManagedMod managedMod = null;
-        private ModBase officialMod = null;
+        internal ModBase officialMod = null;
         public readonly ModSource source;
         internal bool earlyInitRun = false;
         internal string ModID;

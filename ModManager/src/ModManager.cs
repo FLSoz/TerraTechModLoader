@@ -10,7 +10,8 @@ using Steamworks;
 using ModManager.Datastructures;
 using LogManager;
 using Payload.UI.Commands.Steam;
-
+using Newtonsoft.Json.Linq;
+using System.Runtime.CompilerServices;
 
 namespace ModManager
 {
@@ -29,6 +30,7 @@ namespace ModManager
     //  - these will always be loaded properly in the end
     public class ModManager : ModBase
     {
+        internal static bool EnableTTQMMHandling = false;
         private static bool patchedAssemblyLoading = false;
         private static bool patched = false;
         internal const string HarmonyID = "com.flsoz.ttmodding.modmanager";
@@ -69,6 +71,9 @@ namespace ModManager
         internal static Dictionary<Assembly, ModContainer> assemblyMetadata = new Dictionary<Assembly, ModContainer>();
 
         internal static Dictionary<Type, WrappedMod> managedMods = new Dictionary<Type, WrappedMod>();
+        internal static Dictionary<WrappedMod, ModContainer> modMetadata = new Dictionary<WrappedMod, ModContainer>();
+        internal static HashSet<ModContainer> containersWithEarlyHooks = new HashSet<ModContainer>();
+
         internal static Dictionary<string, QMod> unofficialMods = new Dictionary<string, QMod>();
         internal static QMod BlockInjector = null;
         internal static WrappedMod LegacyBlockLoader = null;
@@ -124,70 +129,72 @@ namespace ModManager
             {
                 logger.Info($"Found custom TTSMM mod list: {argument}");
                 string[] mods = argument.Split(new char[] { ',' });
-                foreach (string mod in mods)
+                if (argument.Length > 0 && mods.Length > 0)
                 {
-                    logger.Info($"Processing mod {mod}");
-                    string trimmedMod = mod.Trim(new char[] { '[', ']', ' ' });
-                    string[] modDescrip = trimmedMod.Split(new char[] { ':' });
-                    if (modDescrip.Length == 2)
+                    foreach (string mod in mods)
                     {
-                        string type = modDescrip[0];
-                        string modName = modDescrip[1];
-                        logger.Info($"Mod ({modName}) determined to be of type {type}");
-                        switch (type)
+                        logger.Info($"Processing mod {mod}");
+                        string trimmedMod = mod.Trim(new char[] { '[', ']', ' ' });
+                        string[] modDescrip = trimmedMod.Split(new char[] { ':' });
+                        if (modDescrip.Length == 2)
                         {
-                            case "local":
-                                LocalLoader.LoadLocalMod(modName);
-                                break;
-                            case "workshop":
-                                if (ulong.TryParse(modName, out ulong workshopID))
-                                {
-                                    PublishedFileId_t steamWorkshopID = new PublishedFileId_t(workshopID);
-                                    if (steamWorkshopID != WorkshopID)
+                            string type = modDescrip[0];
+                            string modName = modDescrip[1];
+                            logger.Info($"Mod ({modName}) determined to be of type {type}");
+                            switch (type)
+                            {
+                                case "local":
+                                    LocalLoader.LoadLocalMod(modName);
+                                    break;
+                                case "workshop":
+                                    if (ulong.TryParse(modName, out ulong workshopID))
                                     {
-                                        ManMods manager = Singleton.Manager<ManMods>.inst;
-                                        List<PublishedFileId_t> m_WaitingOnDownloads = (List<PublishedFileId_t>)ReflectedManMods.m_WaitingOnDownloads.GetValue(manager);
-                                        m_WaitingOnDownloads.Add(steamWorkshopID);
-                                        WorkshopLoader.LoadWorkshopMod(new SteamDownloadItemData
+                                        PublishedFileId_t steamWorkshopID = new PublishedFileId_t(workshopID);
+                                        if (steamWorkshopID != WorkshopID)
                                         {
-                                            m_Details = new SteamUGCDetails_t
+                                            ManMods manager = Singleton.Manager<ManMods>.inst;
+                                            List<PublishedFileId_t> m_WaitingOnDownloads = (List<PublishedFileId_t>)ReflectedManMods.m_WaitingOnDownloads.GetValue(manager);
+                                            m_WaitingOnDownloads.Add(steamWorkshopID);
+                                            WorkshopLoader.LoadWorkshopMod(new SteamDownloadItemData
                                             {
-                                                m_nPublishedFileId = steamWorkshopID
-                                            }
-                                        },
-                                        false);
-                                        // We enforce that this is not remote
-                                        logger.Info("Loading workshop mod {WorkshopID}", workshopID);
+                                                m_Details = new SteamUGCDetails_t
+                                                {
+                                                    m_nPublishedFileId = steamWorkshopID
+                                                }
+                                            },
+                                            false);
+                                            // We enforce that this is not remote
+                                            logger.Info("Loading workshop mod {WorkshopID}", workshopID);
+                                        }
+                                        else
+                                        {
+                                            logger.Info("Requested self - ignoring");
+                                        }
                                     }
                                     else
                                     {
-                                        logger.Info("Requested self - ignoring");
+                                        logger.Error("Attempted to load workshop mod with malformed ID {WorkshopID}", modName);
                                     }
-                                }
-                                else
-                                {
-                                    logger.Error("Attempted to load workshop mod with malformed ID {WorkshopID}", modName);
-                                }
-                                break;
-                            case "ttqmm":
-                                logger.Error("Attempted to load mod {Mod} from TTMM. This is currently unsupported", modName);
-                                break;
-                            default:
-                                logger.Error("Found malformed mod request {Mod}", trimmedMod);
-                                break;
+                                    break;
+                                case "ttqmm":
+                                    EnableTTQMMHandling = true;
+                                    logger.Error("Attempted to load mod {Mod} from TTMM. This is currently unsupported", modName);
+                                    break;
+                                default:
+                                    logger.Error("Found malformed mod request {Mod}", trimmedMod);
+                                    break;
+                            }
                         }
                     }
+                    return;
                 }
             }
-            else
-            {
-                // We explicitly loaded only this mod. 
 
-                logger.Info("No custom mod list found - getting default mod loading behaviour");
-                ManMods manMods = Singleton.Manager<ManMods>.inst;
-                typeof(ManMods).GetMethod("CheckForLocalMods", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public).Invoke(manMods, null);
-                typeof(ManMods).GetMethod("CheckForSteamWorkshopMods", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public).Invoke(manMods, null);
-            }
+            // We explicitly loaded only this mod. 
+            logger.Info("No custom mod list found - getting default mod loading behaviour");
+            ManMods manMods = Singleton.Manager<ManMods>.inst;
+            typeof(ManMods).GetMethod("CheckForLocalMods", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public).Invoke(manMods, null);
+            typeof(ManMods).GetMethod("CheckForSteamWorkshopMods", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public).Invoke(manMods, null);
         }
 
         public static void PatchAssemblyLoading()
@@ -198,35 +205,51 @@ namespace ModManager
                 {
                     FileInfo[] RemoteDlls = new DirectoryInfo(WorkshopDir).GetFiles("*.dll", SearchOption.AllDirectories);
                     FileInfo[] LocalDlls = new DirectoryInfo(ManMods.LocalModsDirectory).GetFiles("*.dll", SearchOption.AllDirectories);
-                    
+                    var filesToCheck = RemoteDlls.Concat(LocalDlls);
+
                     // filter to enabled QMod DLLs
-                    FileInfo[] QModDlls = new DirectoryInfo(QModsDir).GetFiles("*.dll", SearchOption.AllDirectories);
-                    var enabledQModDlls = QModDlls.Where(dll => {
-                        if (args.Name.Contains(Path.GetFileNameWithoutExtension(dll.Name)))
+                    if (EnableTTQMMHandling)
+                    {
+                        FileInfo[] QModDlls = new DirectoryInfo(QModsDir).GetFiles("*.dll", SearchOption.AllDirectories);
+                        var enabledQModDlls = QModDlls.Where(dll =>
                         {
-                            FileInfo[] modjson = dll.Directory.GetFiles("mod.json", SearchOption.TopDirectoryOnly);
-                            if (modjson.Length != 0)
+                            if (args.Name.Contains(Path.GetFileNameWithoutExtension(dll.Name)))
                             {
-                                try
+                                FileInfo[] modjson = dll.Directory.GetFiles("mod.json", SearchOption.TopDirectoryOnly);
+                                if (modjson.Length != 0)
                                 {
-                                    if (Newtonsoft.Json.Linq.JObject.Parse(File.ReadAllText(modjson[0].FullName))
-                                        .TryGetValue("Enabled", out Newtonsoft.Json.Linq.JToken isEnabled) &&
-                                        !(bool)isEnabled)
+                                    try
                                     {
-                                        logger.Info("Found assembly {Assembly}, but it's marked as disabled", dll.Name);
+                                        JObject jObject = JObject.Parse(File.ReadAllText(modjson[0].FullName));
+                                        if (
+                                            (jObject.TryGetValue("Enabled", out JToken isEnabled) || jObject.TryGetValue("Enable", out isEnabled))
+                                            && !(bool)isEnabled
+                                        )
+                                        {
+                                            logger.Warn("Found assembly {Assembly}, but it's marked as DISABLED", dll.Name);
+                                            return false;
+                                        }
+                                        else
+                                        {
+                                            logger.Info("Found assembly {Assembly}, marked as ENABLED", dll.Name);
+                                        }
+                                    }
+                                    catch
+                                    {
+                                        // If mod.json fails to parse, then assume it's enabled
+                                        logger.Error("FAILED to parse QMod status for mod {Assembly}, marking as DISABLED", dll.Name);
                                         return false;
                                     }
                                 }
-                                catch {
-                                    // If mod.json fails to parse, then assume it's enabled
-                                }
+                                return true;
                             }
-                            return true;
-                        }
-                        return false;
-                    });
+                            return false;
+                        });
 
-                    foreach (FileInfo dll in RemoteDlls.Concat(LocalDlls).Concat(enabledQModDlls)) {
+                        filesToCheck = filesToCheck.Concat(enabledQModDlls);
+                    }
+
+                    foreach (FileInfo dll in filesToCheck) {
                         if (args.Name.Contains(Path.GetFileNameWithoutExtension(dll.Name)))
                         {
                             logger.Info("Found assembly {assembly}", args.Name);
@@ -250,7 +273,6 @@ namespace ModManager
 
         private static List<WrappedMod> ProcessOrder(Func<IManagedMod, Type[]> getBefore, Func<IManagedMod, Type[]> getAfter)
         {
-            ModSessionInfo session = (ModSessionInfo)ReflectedManMods.m_CurrentSession.GetValue(Singleton.Manager<ManMods>.inst);
             Dictionary<string, ModContainer> mods = (Dictionary<string, ModContainer>)ReflectedManMods.m_Mods.GetValue(Singleton.Manager<ManMods>.inst);
             DependencyGraph<Type> dependencies = new DependencyGraph<Type>();
             // add nodes
@@ -471,7 +493,7 @@ namespace ModManager
         /// </summary>
         /// <param name="modContainer"></param>
         /// <param name="assembly"></param>
-        private static void ProcessLoadAssembly(ModContainer modContainer, Assembly assembly)
+        private static WrappedMod ProcessLoadAssembly(ModContainer modContainer, Assembly assembly)
         {
             ModContents contents = modContainer.Contents;
             PublishedFileId_t workshopID = contents.m_WorkshopId;
@@ -522,7 +544,8 @@ namespace ModManager
                             logger.Debug("Located NON-MANAGED {Local} mod {Script} in mod {Mod} ({ModId})",
                                 localString, type.Name, contents.ModName,
                                 isWorkshop ? modContainer.ModID + " - " + workshopID.ToString() : modContainer.ModID);
-                            wrappedMod = new WrappedMod((Activator.CreateInstance(type) as ModBase), source);
+                            ModBase createdMod = (Activator.CreateInstance(type) as ModBase);
+                            wrappedMod = new WrappedMod(createdMod, source);
                         }
                         wrappedMod.ModID = modContainer.ModID;
                         managedMods.Add(type, wrappedMod);
@@ -530,6 +553,7 @@ namespace ModManager
                         {
                             LegacyBlockLoader = wrappedMod;
                         }
+                        return wrappedMod;
                     }
                     else
                     {
@@ -541,6 +565,7 @@ namespace ModManager
                     }
                 }
             }
+            return null;
         }
 
         /// <summary>
@@ -575,13 +600,15 @@ namespace ModManager
                         contents.Script = null;
                     }
 
-                    foreach (FileInfo fileInfo in Directory.GetParent(modContainer.AssetBundlePath).EnumerateFiles())
+                    DirectoryInfo parentDirectory = Directory.GetParent(modContainer.AssetBundlePath);
+                    logger.Info($"Checking for mods in directory {parentDirectory} for mod ({key})");
+                    foreach (FileInfo fileInfo in parentDirectory.EnumerateFiles())
                     {
                         // Ignore loading ModManager
                         if (fileInfo.Extension == ".dll" && !fileInfo.Name.Contains("ModManager"))
                         {
                             Assembly assembly = Assembly.LoadFrom(fileInfo.FullName);
-
+                            logger.Trace($"Checking dll ${fileInfo.FullName}");
                             if (assemblyMetadata.TryGetValue(assembly, out ModContainer existingMod))
                             {
                                 logger.Debug("Attempting to load assembly {Assembly} as part of Mod {Mod} ({ModID} - {ModLocal}), but assembly is already loaded by mod {ExistingMod} ({ExistingModID} - {ExistingModLocal})",
@@ -595,7 +622,11 @@ namespace ModManager
                             else
                             {
                                 assemblyMetadata.Add(assembly, modContainer);
-                                ProcessLoadAssembly(modContainer, assembly);
+                                WrappedMod createdMod = ProcessLoadAssembly(modContainer, assembly);
+                                if (createdMod != null)
+                                {
+                                    modMetadata.Add(createdMod, modContainer);
+                                }
                             }
                         }
                     }
@@ -710,6 +741,13 @@ namespace ModManager
             }
         }
 
+
+        public static readonly FieldInfo InjectedEarlyHooks = typeof(ModContainer).GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).FirstOrDefault(field =>
+                field.CustomAttributes.Any(attr => attr.AttributeType == typeof(CompilerGeneratedAttribute)) &&
+                (field.DeclaringType == typeof(ModContainer).GetProperty("InjectedEarlyHooks").DeclaringType) &&
+                field.FieldType.IsAssignableFrom(typeof(ModContainer).GetProperty("InjectedEarlyHooks").PropertyType) &&
+                field.Name.StartsWith("<" + typeof(ModContainer).GetProperty("InjectedEarlyHooks").Name + ">")
+            );
         public static void ProcessEarlyInits()
         {
             // Process the EarlyInits
@@ -718,9 +756,14 @@ namespace ModManager
             {
                 if (!script.earlyInitRun)
                 {
-                    logger.Trace("Processing EarlyInit for mod {}", script.Name);
+                    logger.Debug("Processing EarlyInit for mod {}", script.Name);
                     script.EarlyInit();
                     script.earlyInitRun = true;
+
+                    ModContainer container = modMetadata[script];
+                    InjectedEarlyHooks.SetValue(container, true);
+
+                    containersWithEarlyHooks.Add(container);
                 }
             }
         }
@@ -731,7 +774,7 @@ namespace ModManager
             logger.Info("Processing Inits");
             foreach (WrappedMod script in InitQueue)
             {
-                logger.Trace("Processing Init for mod {}", script.Name);
+                logger.Debug("Processing Init for mod {}", script.Name);
                 script.Init();
             }
         }

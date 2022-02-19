@@ -21,6 +21,11 @@ namespace LogManager
         // internal static readonly string TTSteamDir = @"E:/Steam/steamapps/common/TerraTech";
         private static readonly string LogsDir = Path.Combine(TTSteamDir, "Logs");
 
+        internal static ConsoleTarget logconsole = new ConsoleTarget("logconsole")
+        {
+            Layout = "[${logger:shortName=true}] ${level:uppercase=true:padding=-5:alignmentOnTruncation=left} | ${time} | ${message}  ${exception}"
+        };
+
         internal static Dictionary<string, LogLevel> ConfiguredLogLevels = new Dictionary<string, LogLevel>();
         internal static LogLevel ConfiguredGlobalLogLevel = null;
 

@@ -56,7 +56,7 @@ namespace ModManager
             try
             {
                 JObject configJson = Newtonsoft.Json.Linq.JObject.Parse(File.ReadAllText(modConfig.FullName));
-                if (configJson.TryGetValue("Enable", out Newtonsoft.Json.Linq.JToken isEnabled) &&
+                if (configJson.TryGetValue("Enable", out JToken isEnabled) &&
                     !(bool)isEnabled)
                 {
                     logger.Info("Found mod in directory {Folder}, but it's marked as disabled", modConfig.Directory.Name);
@@ -136,7 +136,6 @@ namespace ModManager
                                 {
                                     mod.LoadOrder = ModManager.DEFAULT_LOAD_ORDER;
                                 }
-
                                 return mod;
                             }
                             else

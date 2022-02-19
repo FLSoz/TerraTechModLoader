@@ -3,18 +3,119 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.IO;
+using System.Diagnostics;
 using System.Threading.Tasks;
 using System.Reflection;
 using System.Reflection.Emit;
 using HarmonyLib;
 using UnityEngine;
 using Payload.UI.Commands.Steam;
+using TerraTech.Network;
+using Steamworks;
 
 
 namespace ModManager
 {
     public static class Patches
     {
+        /// <summary>
+        /// Patch Lobby filtering to only show lobbies that also have 0ModManager
+        /// </summary>
+        [HarmonyPatch(typeof(LobbySystem.LobbyFilterOptions), "IsLobbyAcceptable")]
+        public static class PatchMPLobbies
+        {
+            [HarmonyPostfix]
+            public static void Postfix(ref bool __result, LobbyData ld)
+            {
+                if (__result)
+                {
+                    PublishedFileId_t[] workshopIds = ld.m_WorkshopIds;
+                    // This mod is present here: https://steamcommunity.com/sharedfiles/filedetails/?id=2655051786
+                    if (!workshopIds.Contains(new PublishedFileId_t(2655051786))) {
+                        __result = false;
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Patch restarting game with TTSMM to use the requested mod session
+        /// </summary>
+        [HarmonyPatch(typeof(ManMods), "RequestRestartGame")]
+        public static class PatchGameRestart
+        {
+            internal static string GetTTSMMModList(ModSessionInfo modList)
+            {
+                ModSessionInfo session = modList;
+                
+                if (session == null)
+                {
+                    session = (ModSessionInfo) ReflectedManMods.m_CurrentSession.GetValue(Singleton.Manager<ManMods>.inst);
+                }
+                StringBuilder sb = new StringBuilder();
+                if (session != null)
+                {
+                    foreach (ModContainer modContainer in session)
+                    {
+                        if (modContainer != null && !modContainer.IsRemote)
+                        {
+                            sb.Append($"[workshop:{modContainer.Contents.m_WorkshopId}],");
+                        }
+                    }
+                }
+                return sb.ToString().Trim(',');
+            }
+
+            internal static string GetCurrentArgs()
+            {
+                string[] currentArgs = CommandLineReader.GetCommandLineArgs();
+                StringBuilder sb = new StringBuilder(" ");
+
+                bool ignoreParameter = false;
+                for (int i = 0; i < currentArgs.Length; i++)
+                {
+                    string currentArg = currentArgs[i];
+                    if (currentArg == "+connect_lobby")
+                    {
+                        ignoreParameter = true;
+                    }
+                    else if (currentArg == "+custom_mod_list")
+                    {
+                        ignoreParameter = true;
+                    }
+                    else if (currentArg == "+ttsmm_mod_list")
+                    {
+                        ignoreParameter = true;
+                    }
+                    else if (ignoreParameter)
+                    {
+                        ignoreParameter = false;
+                    }
+                    else
+                    {
+                        sb.Append(" " + currentArg);
+                    }
+                }
+
+                return sb.ToString().Trim();
+            }
+
+            [HarmonyPrefix]
+            public static bool Prefix(ModSessionInfo modList, TTNetworkID lobbyID)
+            {
+                new Process
+                {
+                    StartInfo =
+                    {
+                        FileName = Process.GetCurrentProcess().StartInfo.FileName,
+                        Arguments = string.Format("{0} +connect_lobby {1} +custom_mod_list {2} +ttsmm_mod_list {3}", GetCurrentArgs(), lobbyID.m_NetworkID, "[:2655051786]", GetTTSMMModList(modList))
+                    }
+                }.Start();
+                Application.Quit();
+                return false;
+            }
+        }
+
         /// <summary>
         /// Patch InitModScripts to do all EarlyInits, and Inits, in our specified order.
         /// </summary>
@@ -182,6 +283,48 @@ namespace ModManager
             {
                 WorkshopLoader.LoadWorkshopMod(item, remote);
                 return false;
+            }
+        }
+
+        internal static class TTMMPatches
+        {
+            [HarmonyLib.HarmonyPatch(typeof(UIScreenBugReport), "Set")]
+            internal static class UIScreenBugReport_Set
+            {
+                internal static void Postfix(UIScreenBugReport __instance)
+                {
+                    if (ModManager.EnableTTQMMHandling)
+                    {
+                        typeof(UIScreenBugReport).GetField("m_ErrorCatcher", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(__instance, false);
+                    }
+                }
+            }
+
+            [HarmonyLib.HarmonyPatch(typeof(UIScreenBugReport), "Post")]
+            internal static class UIScreenBugReport_Post
+            {
+                internal static bool Prefix(UIScreenBugReport __instance)
+                {
+                    if (ModManager.EnableTTQMMHandling)
+                    {
+                        ManUI.inst.ShowErrorPopup("In-game bug reporting has been disabled for modded clients");
+                        __instance.ExitScreen();
+                        return false;
+                    }
+                    return true;
+                }
+            }
+
+            [HarmonyLib.HarmonyPatch(typeof(TerraTech.Network.LobbySystem), "GetInstalledModsHash")]
+            internal static class LobbySystem_GetInstalledModsHash
+            {
+                internal static void Postfix(ref int __result)
+                {
+                    if (ModManager.EnableTTQMMHandling)
+                    {
+                        __result = 0x7AC0BE11;
+                    }
+                }
             }
         }
     }

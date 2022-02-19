@@ -12,14 +12,8 @@ namespace LogManager
             {
                 Manager.config = new NLog.Config.LoggingConfiguration();
 
-                // Rule for default console
-                ConsoleTarget logconsole = new ConsoleTarget("logconsole")
-                {
-                    Layout = "[${logger:shortName=true}] ${level:uppercase=true:padding=-5:alignmentOnTruncation=left} | ${time} | ${message}  ${exception}"
-                };
-
                 // Rules for mapping loggers to targets
-                // Manager.config.AddRule(LogLevel.Error, LogLevel.Fatal, logconsole);
+                // Manager.config.AddRule(LogLevel.Error, LogLevel.Fatal, Manager.logconsole);
 
                 // Apply config           
                 NLog.LogManager.Configuration = Manager.config;
@@ -34,6 +28,7 @@ namespace LogManager
                 );
 
                 // read configuration
+                bool defaultLogging = false; 
                 string[] commandLineArgs = CommandLineReader.GetCommandLineArgs();
                 for (int i = 0; i < commandLineArgs.Length; i++)
                 {
@@ -51,8 +46,20 @@ namespace LogManager
                             Manager.ConfiguredLogLevels.Add(loggerName, LogLevel.FromString(argValue));
                         }
                     }
+                    else if (arg == "+default_logging")
+                    {
+                        defaultLogging = true;
+                    }
+                    else if (arg == "+enable_vanilla_logs")
+                    {
+                        Patches.EnableVanillaLogs = true;
+                    }
                 }
 
+                if (!defaultLogging)
+                {
+                    Patches.Init();
+                }
                 Inited = true;
             }
         }
