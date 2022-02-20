@@ -130,7 +130,7 @@ namespace LogManager
 
             LogLevel minLevel = defaultMinLevel is null ? LogLevel.Debug : defaultMinLevel;
 
-            if (ConfiguredLogLevels.TryGetValue(logger.Name, out LogLevel configuredLevel))
+            if (ConfiguredLogLevels.TryGetValue(logger.Name, out LogLevel configuredLevel) && configuredLevel != null)
             {
                 minLevel = configuredLevel;
             }

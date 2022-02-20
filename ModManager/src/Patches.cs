@@ -21,7 +21,7 @@ namespace ModManager
         /// <summary>
         /// Patch Lobby filtering to only show lobbies that also have 0ModManager
         /// </summary>
-        [HarmonyPatch(typeof(LobbySystem.LobbyFilterOptions), "IsLobbyAcceptable")]
+        [HarmonyPatch(typeof(LobbySystem.LobbyFilterOptions), "isLobbyAcceptable")]
         public static class PatchMPLobbies
         {
             [HarmonyPostfix]
