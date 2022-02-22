@@ -132,6 +132,7 @@ namespace LogManager
 
             if (ConfiguredLogLevels.TryGetValue(logger.Name, out LogLevel configuredLevel) && configuredLevel != null)
             {
+                Console.WriteLine($"Registering logger {logger.Name} with logging level {configuredLevel}");
                 minLevel = configuredLevel;
             }
             else
@@ -139,11 +140,17 @@ namespace LogManager
                 string shortLoggerName = logger.Name.Substring(logger.Name.LastIndexOf('.') + 1);
                 if (ConfiguredLogLevels.TryGetValue(shortLoggerName, out configuredLevel) && configuredLevel != null)
                 {
+                    Console.WriteLine($"Registering logger {shortLoggerName} with logging level {configuredLevel}");
                     minLevel = configuredLevel;
                 }
                 else if (ConfiguredGlobalLogLevel != null)
                 {
+                    Console.WriteLine($"Registering logger {shortLoggerName} with GLOBAL DEFAULT logging level {ConfiguredGlobalLogLevel}");
                     minLevel = ConfiguredGlobalLogLevel;
+                }
+                else
+                {
+                    Console.WriteLine($"Registering logger {shortLoggerName} with default logging level {minLevel}");
                 }
             }
 
@@ -160,7 +167,7 @@ namespace LogManager
                 keepOldFiles = logConfig.keepOldFiles
             };
             LogTarget logTarget = RegisterLoggingTarget(logger.Name, generatedConfig);
-            RegisterLogger(logger, logTarget);
+            RegisterLogger(logger, logTarget, logConfig.defaultMinLevel);
         }
     }
 }

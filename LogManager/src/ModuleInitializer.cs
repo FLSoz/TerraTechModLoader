@@ -1,5 +1,6 @@
 ﻿using NLog;
 using NLog.Targets;
+using System;
 
 namespace LogManager
 {
@@ -43,7 +44,9 @@ namespace LogManager
                         else if (arg[10] == '_')
                         {
                             string loggerName = arg.Substring(11);
-                            Manager.ConfiguredLogLevels.Add(loggerName, LogLevel.FromString(argValue));
+                            LogLevel logLevel = LogLevel.FromString(argValue);
+                            Manager.ConfiguredLogLevels.Add(loggerName, logLevel);
+                            Console.WriteLine($"Detected logging config of {logLevel} for logger {loggerName}");
                         }
                     }
                     else if (arg == "+default_logging")
