@@ -4,11 +4,13 @@ using System;
 
 namespace LogManager
 {
-    internal static class ModuleInitializer
+    public static class ModuleInitializer
     {
-        private static bool Inited;
-        internal static void Run()
+        private static bool Inited = false;
+        public static void Run()
         {
+            Console.WriteLine("[LogManager] Initializing logging manager...");
+
             if (!Inited)
             {
                 Manager.config = new NLog.Config.LoggingConfiguration();

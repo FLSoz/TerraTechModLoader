@@ -9,7 +9,7 @@
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>ModManager</RootNamespace>
-    <AssemblyName>0ModManager</AssemblyName>
+    <AssemblyName>TTModManager</AssemblyName>
     <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <Deterministic>true</Deterministic>
@@ -82,6 +82,10 @@
       <HintPath>..\..\..\..\Steam\steamapps\common\TerraTech\TerraTechWin64_Data\Managed\UnityEngine.PhysicsModule.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <Reference Include="UnityEngine.UI">
+      <HintPath>..\..\..\..\Steam\steamapps\common\TerraTech\TerraTechWin64_Data\Managed\UnityEngine.UI.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Properties\AssemblyInfo.cs" />
@@ -101,6 +105,10 @@
     <Compile Include="src\WrappedMod.cs" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\0AssemblyLoader\0AssemblyLoader.csproj">
+      <Project>{491369c2-aacc-4ce6-889d-c5802a1f5307}</Project>
+      <Name>0AssemblyLoader</Name>
+    </ProjectReference>
     <ProjectReference Include="..\LogManager\LogManager.csproj">
       <Project>{911eed8c-e525-4596-84e7-11be2a401523}</Project>
       <Name>LogManager</Name>

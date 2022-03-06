@@ -18,6 +18,8 @@ namespace ModManager
 {
     public static class Patches
     {
+        internal static bool RequiresRestart = false;
+
         /// <summary>
         /// Patch Lobby filtering to only show lobbies that also have 0ModManager
         /// </summary>
@@ -41,65 +43,141 @@ namespace ModManager
         /// <summary>
         /// Patch restarting game with TTSMM to use the requested mod session
         /// </summary>
-        [HarmonyPatch(typeof(ManMods), "RequestRestartGame")]
-        public static class PatchGameRestart
+        [HarmonyPatch(typeof(ManMods), "SessionRequiresRestart")]
+        public static class PatchCheckNeedsRestart
         {
-            internal static string GetTTSMMModList(ModSessionInfo modList)
+
+            [HarmonyPrefix]
+            public static bool Prefix(ref bool __result)
             {
-                ModSessionInfo session = modList;
-                
-                if (session == null)
-                {
-                    session = (ModSessionInfo) ReflectedManMods.m_CurrentSession.GetValue(Singleton.Manager<ManMods>.inst);
+                if (!ModManager.LoadedWithProperParameters) {
+                    RequiresRestart = true;
+                    __result = false;
+                    return false;
                 }
-                StringBuilder sb = new StringBuilder();
-                if (session != null)
+                return true;
+            }
+        }
+
+        internal static string GetTTSMMModList(ModSessionInfo modList)
+        {
+            ModSessionInfo session = modList;
+
+            if (session == null)
+            {
+                session = (ModSessionInfo)ReflectedManMods.m_CurrentSession.GetValue(Singleton.Manager<ManMods>.inst);
+            }
+            StringBuilder sb = new StringBuilder();
+            if (session != null)
+            {
+                foreach (ModContainer modContainer in session)
                 {
-                    foreach (ModContainer modContainer in session)
+                    if (modContainer != null)
                     {
-                        if (modContainer != null && !modContainer.IsRemote)
+                        if (!modContainer.IsRemote && (ulong) modContainer.Contents.m_WorkshopId > 0)
                         {
                             sb.Append($"[workshop:{modContainer.Contents.m_WorkshopId}],");
                         }
+                        else
+                        {
+                            string path = modContainer.AssetBundlePath;
+                            if (path.Contains(ManMods.LocalModsDirectory))
+                            {
+                                string directoryPath = Path.GetDirectoryName(path);
+                                string name = new DirectoryInfo(directoryPath).Name;
+                                string sanitizedName = name.Replace(" ", ":/%20");
+                                sb.Append($"[local:{sanitizedName}],");
+                                if (sanitizedName != name)
+                                {
+                                    ModManager.logger.Warn($"Replacing bad Local Mods directory path {name} with sanitized version {sanitizedName}");
+                                }
+                            }
+                            else
+                            {
+                                ModManager.logger.Warn($"Unable to add mod at {modContainer.AssetBundlePath} with workshop ID {modContainer.Contents.m_WorkshopId}");
+                            }
+                        }
                     }
                 }
-                return sb.ToString().Trim(',');
             }
+            return sb.ToString().Trim(',');
+        }
 
-            internal static string GetCurrentArgs()
+        internal static string GetCurrentArgs()
+        {
+            string[] currentArgs = CommandLineReader.GetCommandLineArgs();
+            StringBuilder sb = new StringBuilder(" ");
+
+            bool ignoreParameter = false;
+            for (int i = 1; i < currentArgs.Length; i++)
             {
-                string[] currentArgs = CommandLineReader.GetCommandLineArgs();
-                StringBuilder sb = new StringBuilder(" ");
-
-                bool ignoreParameter = false;
-                for (int i = 0; i < currentArgs.Length; i++)
+                string currentArg = currentArgs[i];
+                if (currentArg == "+connect_lobby")
                 {
-                    string currentArg = currentArgs[i];
-                    if (currentArg == "+connect_lobby")
-                    {
-                        ignoreParameter = true;
-                    }
-                    else if (currentArg == "+custom_mod_list")
-                    {
-                        ignoreParameter = true;
-                    }
-                    else if (currentArg == "+ttsmm_mod_list")
-                    {
-                        ignoreParameter = true;
-                    }
-                    else if (ignoreParameter)
-                    {
-                        ignoreParameter = false;
-                    }
-                    else
-                    {
-                        sb.Append(" " + currentArg);
-                    }
+                    ignoreParameter = true;
                 }
-
-                return sb.ToString().Trim();
+                else if (currentArg == "+custom_mod_list")
+                {
+                    ignoreParameter = true;
+                }
+                else if (currentArg == "+ttsmm_mod_list")
+                {
+                    ignoreParameter = true;
+                }
+                else if (ignoreParameter)
+                {
+                    ignoreParameter = false;
+                }
+                else
+                {
+                    sb.Append(" " + currentArg);
+                }
             }
 
+            return sb.ToString().Trim();
+        }
+
+        internal static string GetExecutablePath()
+        {
+            string attempt = Process.GetCurrentProcess().StartInfo.FileName;
+            if (attempt != null && attempt.Trim().Length > 0)
+            {
+                return attempt.Trim();
+            }
+            return ModManager.ExecutablePath;
+        }
+
+        /// <summary>
+        /// Patch restarting game with TTSMM to use the requested mod session
+        /// </summary>
+        [HarmonyPatch(typeof(ManMods), "InjectModdedContentIntoGame")]
+        public static class PatchForceGameRestart
+        {
+
+            [HarmonyPostfix]
+            public static void Postfix(ModSessionInfo newSessionInfo)
+            {
+                if (RequiresRestart)
+                {
+                    new Process
+                    {
+                        StartInfo =
+                        {
+                            FileName = GetExecutablePath(),
+                            Arguments = string.Format("{0} +custom_mod_list {1} +ttsmm_mod_list {2}", GetCurrentArgs(), "[:2655051786]", GetTTSMMModList(newSessionInfo))
+                        }
+                    }.Start();
+                    Application.Quit();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Patch restarting game with TTSMM to use the requested mod session
+        /// </summary>
+        [HarmonyPatch(typeof(ManMods), "RequestRestartGame")]
+        public static class PatchGameRestart
+        {
             [HarmonyPrefix]
             public static bool Prefix(ModSessionInfo modList, TTNetworkID lobbyID)
             {
@@ -107,7 +185,7 @@ namespace ModManager
                 {
                     StartInfo =
                     {
-                        FileName = Process.GetCurrentProcess().StartInfo.FileName,
+                        FileName = GetExecutablePath(),
                         Arguments = string.Format("{0} +connect_lobby {1} +custom_mod_list {2} +ttsmm_mod_list {3}", GetCurrentArgs(), lobbyID.m_NetworkID, "[:2655051786]", GetTTSMMModList(modList))
                     }
                 }.Start();
@@ -275,6 +353,7 @@ namespace ModManager
         }
 
         // Patch workshop loading to make sure all dependencies are loaded first
+        // Also use our workflow to circumvent callback missed errors. Can only have it fail on first load now.
         [HarmonyPatch(typeof(ManMods), "LoadWorkshopData")]
         public static class PatchWorkshopLoad
         {
@@ -283,6 +362,24 @@ namespace ModManager
             {
                 WorkshopLoader.LoadWorkshopMod(item, remote);
                 return false;
+            }
+        }
+
+        // Patch the loading screen to show more progress
+        [HarmonyPatch(typeof(UILoadingScreenModProgress), "Update")]
+        public static class PatchLoadingBar
+        {
+            [HarmonyPrefix]
+            public static bool Prefix(ref UILoadingScreenModProgress __instance)
+            {
+                if (ModManager.CurrentOperation != null)
+                {
+                    __instance.loadingBar.SetActive(true);
+                    __instance.loadingProgressText.text = $"{ModManager.CurrentOperation}\n{ModManager.CurrentOperationSpecifics} - {ModManager.CurrentOperationProgress}%";
+                    __instance.loadingProgressImage.fillAmount = ModManager.CurrentOperationProgress;
+                    return false;
+                }
+                return true;
             }
         }
 

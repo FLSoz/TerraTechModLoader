@@ -33,8 +33,10 @@ namespace ModManager
         internal static bool EnableTTQMMHandling = false;
         private static bool patchedAssemblyLoading = false;
         private static bool patched = false;
+        internal static bool LoadedWithProperParameters = false;
         internal const string HarmonyID = "com.flsoz.ttmodding.modmanager";
         internal static PublishedFileId_t WorkshopID = new PublishedFileId_t(2655051786);
+        internal static string ExecutablePath;
 
         internal static readonly string TTSteamDir = Path.GetFullPath(Path.Combine(
             AppDomain.CurrentDomain.GetAssemblies()
@@ -77,6 +79,10 @@ namespace ModManager
         internal static Dictionary<string, QMod> unofficialMods = new Dictionary<string, QMod>();
         internal static QMod BlockInjector = null;
         internal static WrappedMod LegacyBlockLoader = null;
+
+        internal static string CurrentOperation = null;
+        internal static string CurrentOperationSpecifics = null;
+        internal static float CurrentOperationProgress = 0.0f;
 
         public override void DeInit()
         {
@@ -122,8 +128,14 @@ namespace ModManager
             Patch();
         }
 
+        internal static void SetHarmonyDebug()
+        {
+            Harmony.DEBUG = true;
+        }
+
         internal static void RequestConfiguredModSession()
         {
+            LoadedWithProperParameters = true;
             string argument = CommandLineReader.GetArgument("+ttsmm_mod_list");
             if (argument != null)
             {
@@ -197,21 +209,70 @@ namespace ModManager
             typeof(ManMods).GetMethod("CheckForSteamWorkshopMods", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public).Invoke(manMods, null);
         }
 
+        internal static bool TryFindAssembly(ModContainer mod, string name, out Assembly assembly)
+        {
+            assembly = null;
+            ModContents contents = mod.Contents;
+
+            // This bit of code should never be run on a normal setup (Local mod)
+            // This will null the script parts of any mods, if mod manager is loaded after them.
+            // Should only happen in case of Multiplayer
+            ModBase script = mod.Script;
+            if (script != null && !(script is ModManager))
+            {
+                contents.Script = null;
+            }
+
+            DirectoryInfo parentDirectory = Directory.GetParent(mod.AssetBundlePath);
+            FileInfo[] dlls = parentDirectory.GetFiles("*.dll", SearchOption.AllDirectories);
+
+            foreach (FileInfo dll in dlls)
+            {
+                if (name.Contains(Path.GetFileNameWithoutExtension(dll.Name)))
+                {
+                    logger.Info("Found assembly {assembly}", name);
+                    assembly = Assembly.LoadFrom(dll.FullName);
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         public static void PatchAssemblyLoading()
         {
             if (!patchedAssemblyLoading)
             {
                 AppDomain.CurrentDomain.AssemblyResolve += delegate (object sender, ResolveEventArgs args)
                 {
-                    FileInfo[] RemoteDlls = new DirectoryInfo(WorkshopDir).GetFiles("*.dll", SearchOption.AllDirectories);
-                    FileInfo[] LocalDlls = new DirectoryInfo(ManMods.LocalModsDirectory).GetFiles("*.dll", SearchOption.AllDirectories);
-                    var filesToCheck = RemoteDlls.Concat(LocalDlls);
+                    ModSessionInfo session = (ModSessionInfo)ReflectedManMods.m_CurrentSession.GetValue(Singleton.Manager<ManMods>.inst);
+                    Dictionary<string, ModContainer> mods = (Dictionary<string, ModContainer>)ReflectedManMods.m_Mods.GetValue(Singleton.Manager<ManMods>.inst);
+
+                    // Try to get .dll from mod that shares its name, if extant
+                    if (mods.TryGetValue(args.Name, out ModContainer mod) && TryFindAssembly(mod, args.Name, out Assembly assembly))
+                    {
+                        return assembly;
+                    }
+                    foreach (string key in session.Mods.Keys)
+                    {
+                        if (key != args.Name)
+                        {
+                            ModContainer modContainer;
+                            if (mods.TryGetValue(key, out modContainer) && modContainer != null)
+                            {
+                                if (TryFindAssembly(modContainer, args.Name, out assembly))
+                                {
+                                    return assembly;
+                                }
+                            }
+                        }
+                    }
 
                     // filter to enabled QMod DLLs
                     if (EnableTTQMMHandling)
                     {
                         FileInfo[] QModDlls = new DirectoryInfo(QModsDir).GetFiles("*.dll", SearchOption.AllDirectories);
-                        var enabledQModDlls = QModDlls.Where(dll =>
+                        IEnumerable<FileInfo> enabledQModDlls = QModDlls.Where(dll =>
                         {
                             if (args.Name.Contains(Path.GetFileNameWithoutExtension(dll.Name)))
                             {
@@ -246,24 +307,18 @@ namespace ModManager
                             return false;
                         });
 
-                        filesToCheck = filesToCheck.Concat(enabledQModDlls);
-                    }
-
-                    foreach (FileInfo dll in filesToCheck) {
-                        if (args.Name.Contains(Path.GetFileNameWithoutExtension(dll.Name)))
+                        foreach (FileInfo dll in enabledQModDlls)
                         {
-                            logger.Info("Found assembly {assembly}", args.Name);
-                            return Assembly.LoadFrom(dll.FullName);
+                            if (args.Name.Contains(Path.GetFileNameWithoutExtension(dll.Name)))
+                            {
+                                logger.Info("Found assembly {assembly}", args.Name);
+                                return Assembly.LoadFrom(dll.FullName);
+                            }
                         }
                     }
+
                     logger.Info("Could not find assembly {assembly}", args.Name);
                     return null;
-                };
-
-                AppDomain.CurrentDomain.AssemblyLoad += delegate (object sender, AssemblyLoadEventArgs args)
-                {
-                    Assembly assembly = args.LoadedAssembly;
-                    logger.Trace("Loaded Assembly {Assembly}", assembly.FullName);
                 };
 
                 patchedAssemblyLoading = true;
@@ -380,8 +435,14 @@ namespace ModManager
             // Find all mods
             DirectoryInfo unofficialModsDir = new DirectoryInfo(QModsDir);
             DirectoryInfo[] subDirs = unofficialModsDir.GetDirectories();
+            int numMods = subDirs.Length;
+            int processed = 0;
+            CurrentOperation = "Processing TTMM Mods";
             foreach (DirectoryInfo subDir in subDirs)
             {
+                CurrentOperationSpecifics = $"Processing {subDir.Name}";
+                CurrentOperationProgress = (float)processed / (float)numMods;
+
                 FileInfo config = new FileInfo(Path.Combine(subDir.FullName, "mod.json"));
                 FileInfo ttmmInfo = new FileInfo(Path.Combine(subDir.FullName, "ttmm.json"));
                 logger.Debug("Exploring subdirectory {Subdir}", subDir.Name);
@@ -394,7 +455,10 @@ namespace ModManager
                         ModManager.unofficialMods.Add(mod.ID, mod);
                     }
                 }
+                processed++;
             }
+            CurrentOperationSpecifics = null;
+            CurrentOperation = null;
 
             DependencyGraph<QMod> dependencies = new DependencyGraph<QMod>();
 
@@ -431,8 +495,14 @@ namespace ModManager
             }
 
             // Load them
+            numMods = ModManager.unofficialMods.Count;
+            processed = 0;
+            CurrentOperation = "Loading TTMM Mods";
             foreach (QMod mod in dependencies.OrderedQueue())
             {
+                CurrentOperationSpecifics = $"Loading {mod.Name}";
+                CurrentOperationProgress = (float)processed / (float)numMods;
+
                 if (!mod.IsBlockInjector)
                 {
                     logger.Info("Loading {Mod}", mod);
@@ -460,7 +530,10 @@ namespace ModManager
                     BlockInjector = mod;
                     logger.Info("Not executing BlockInjector entry method - will wait and see if NuterraSteam is executed first");
                 }
+                processed++;
             }
+            CurrentOperationSpecifics = null;
+            CurrentOperation = null;
         }
 
         /// <summary>
@@ -509,9 +582,8 @@ namespace ModManager
             }
             catch (System.Reflection.ReflectionTypeLoadException ex)
             {
-                logger.Error("Failed to get types for {Assembly} - assuming dependency failure and reloading", assembly.FullName);
-                Assembly reloadedAssembly = Assembly.Load(assembly.GetName());
-                types = reloadedAssembly.GetExportedTypes();
+                logger.Error("Failed to get types for {Assembly} - assuming dependency failure, saving for forced reload", assembly.FullName);
+                return null;
             }
 
             foreach (Type type in types)
@@ -584,8 +656,14 @@ namespace ModManager
 
             // Clear out any and all script mods that are present
             logger.Info("Reprocessing all mods in session");
+            int numMods = session.Mods.Count;
+            int processed = 0;
+            CurrentOperation = "Processing potential code mods";
             foreach (string key in session.Mods.Keys)
             {
+                CurrentOperationSpecifics = $"Post-processing {key}";
+                CurrentOperationProgress = (float) processed / (float) numMods;
+
                 ModContainer modContainer;
                 if (mods.TryGetValue(key, out modContainer) && modContainer != null)
                 {
@@ -631,7 +709,10 @@ namespace ModManager
                         }
                     }
                 }
+                processed++;
             }
+            CurrentOperationSpecifics = null;
+            CurrentOperation = null;
             logger.Info("All mods reprocessed. Determining dependencies");
 
             // Process the correct load order of EarlyInits
@@ -752,31 +833,61 @@ namespace ModManager
         {
             // Process the EarlyInits
             logger.Info("Processing Early Inits");
+            int numMods = EarlyInitQueue.Count;
+            int processed = 0;
+            CurrentOperation = "Handling code mod first-time setup";
             foreach (WrappedMod script in EarlyInitQueue)
             {
+                CurrentOperationSpecifics = $"Processing {script.Name} EarlyInit()";
+                CurrentOperationProgress = (float)processed / (float)numMods;
                 if (!script.earlyInitRun)
                 {
-                    logger.Debug("Processing EarlyInit for mod {}", script.Name);
-                    script.EarlyInit();
-                    script.earlyInitRun = true;
+                    try
+                    {
+                        logger.Debug("Processing EarlyInit for mod {}", script.Name);
+                        script.EarlyInit();
+                        script.earlyInitRun = true;
 
-                    ModContainer container = modMetadata[script];
-                    InjectedEarlyHooks.SetValue(container, true);
+                        ModContainer container = modMetadata[script];
+                        InjectedEarlyHooks.SetValue(container, true);
 
-                    containersWithEarlyHooks.Add(container);
+                        containersWithEarlyHooks.Add(container);
+                    }
+                    catch (Exception e)
+                    {
+                        logger.Error(e, $"Failed to process EarlyInit() for {script.Name}");
+                    }
                 }
+                processed++;
             }
+            CurrentOperationSpecifics = null;
+            CurrentOperation = null;
         }
 
         public static void ProcessInits()
         {
             // Process the Inits
             logger.Info("Processing Inits");
+            int numMods = InitQueue.Count;
+            int processed = 0;
+            CurrentOperation = "Initializing code mods";
             foreach (WrappedMod script in InitQueue)
             {
+                CurrentOperationSpecifics = $"Processing {script.Name} Init()";
+                CurrentOperationProgress = (float)processed / (float)numMods;
                 logger.Debug("Processing Init for mod {}", script.Name);
-                script.Init();
+                try
+                {
+                    script.Init();
+                }
+                catch (Exception e)
+                {
+                    logger.Error(e, $"Failed to process Init() for {script.Name}");
+                }
+                processed++;
             }
+            CurrentOperation = null;
+            CurrentOperationSpecifics = null;
         }
     }
 }

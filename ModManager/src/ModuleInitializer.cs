@@ -3,15 +3,16 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.IO;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using ModManager.Datastructures;
-using HarmonyLib;
 
-internal static class ModuleInitializer
+public static class ModuleInitializer
 {
     private static bool Inited = false;
 
-    internal static void Run()
+    public static void Run()
     {
         if (!Inited)
         {
@@ -28,28 +29,31 @@ internal static class ModuleInitializer
             ModManager.ModManager.Patch();
             ModManager.ModManager.logger.Info("Assembly Initialization Complete");
 
-            // Only handle session requests if loaded via TTSMM. Otherwise, proceed as normal
-            if (CommandLineReader.GetArgument("+custom_mod_list") != null)
+            // Allow debug settings to happen even in normal operation
+            string[] commandLineArgs = CommandLineReader.GetCommandLineArgs();
+            ModManager.ModManager.logger.Info($"Running game with params: {String.Join(" ", commandLineArgs)}");
+            for (int i = 0; i < commandLineArgs.Length; i++)
             {
-                ModManager.ModManager.RequestConfiguredModSession();
-            }
-            else
-            {
-                string[] commandLineArgs = CommandLineReader.GetCommandLineArgs();
-                for (int i = 0; i < commandLineArgs.Length; i++)
+                if (i == 0)
                 {
-                    if (commandLineArgs[i] == "+manage_ttmm")
-                    {
-                        ModManager.ModManager.EnableTTQMMHandling = true;
-                        ModManager.ModManager.ProcessUnofficialMods();
-                    }
-                    else if (commandLineArgs[i] == "+harmony_debug")
-                    {
-                        Harmony.DEBUG = true;
-                    }
+                    ModManager.ModManager.ExecutablePath = commandLineArgs[i];
+                    ModManager.ModManager.logger.Info($"Backup executable path: {ModManager.ModManager.ExecutablePath}");
+                }
+
+                if (commandLineArgs[i] == "+manage_ttmm")
+                {
+                    ModManager.ModManager.EnableTTQMMHandling = true;
+                    ModManager.ModManager.ProcessUnofficialMods();
+                }
+                else if (commandLineArgs[i] == "+harmony_debug")
+                {
+                    ModManager.ModManager.SetHarmonyDebug();
+                }
+                else if (commandLineArgs[i] == "+custom_mod_list")
+                {
+                    ModManager.ModManager.RequestConfiguredModSession();
                 }
             }
-
             Inited = true;
         }
     }

@@ -15,7 +15,8 @@ namespace ModManager
 
 		internal static void LoadLocalMod(string name)
 		{
-			string modPath = Path.Combine(ModManager.TTSteamDir, ManMods.LocalModsDirectory, name);
+			string undoSanitize = name.Replace(":/%20", " ");
+			string modPath = Path.Combine(ModManager.TTSteamDir, ManMods.LocalModsDirectory, undoSanitize);
 			if (Directory.Exists(modPath))
 			{
 				foreach (string text in Directory.GetDirectories(ManMods.LocalModsDirectory))
@@ -57,7 +58,7 @@ namespace ModManager
 			}
 			else
 			{
-				ModManager.logger.Error("Could not find local mod {Mod} at {ModPath}", name, modPath);
+				ModManager.logger.Error("Could not find local mod {Mod} ({Actual}) at {ModPath}", name, undoSanitize, modPath);
 			}
 		}
     }
