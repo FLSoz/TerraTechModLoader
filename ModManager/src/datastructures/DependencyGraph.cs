@@ -21,12 +21,12 @@ namespace ModManager.Datastructures
         private static NLog.Logger logger = NLog.LogManager.GetLogger($"ModManager.DependencyGraph-{typeof(T).Name}");
         internal static void ConfigureLogger()
         {
-            Manager.LogConfig config = new Manager.LogConfig
+            LogManager.LogConfig config = new LogManager.LogConfig
             {
                 layout = "${longdate} | ${level:uppercase=true:padding=-5:alignmentOnTruncation=left} | ${logger:shortName=true} | ${message}  ${exception}",
                 keepOldFiles = false
             };
-            Manager.RegisterLogger(logger, config);
+            TTLogManager.RegisterLogger(logger, config);
         }
 
         public DependencyGraph() { }

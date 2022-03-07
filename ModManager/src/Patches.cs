@@ -74,14 +74,15 @@ namespace ModManager
                 {
                     if (modContainer != null)
                     {
-                        if (!modContainer.IsRemote && (ulong) modContainer.Contents.m_WorkshopId > 0)
+                        if (!modContainer.IsRemote && !modContainer.Local && (ulong) modContainer.Contents.m_WorkshopId > 0)
                         {
+                            ModManager.logger.Info($"Found workshop mod {modContainer.ModID} with workshop ID {modContainer.Contents.m_WorkshopId}");
                             sb.Append($"[workshop:{modContainer.Contents.m_WorkshopId}],");
                         }
                         else
                         {
                             string path = modContainer.AssetBundlePath;
-                            if (path.Contains(ManMods.LocalModsDirectory))
+                            if (modContainer.Local)
                             {
                                 string directoryPath = Path.GetDirectoryName(path);
                                 string name = new DirectoryInfo(directoryPath).Name;
@@ -94,7 +95,7 @@ namespace ModManager
                             }
                             else
                             {
-                                ModManager.logger.Warn($"Unable to add mod at {modContainer.AssetBundlePath} with workshop ID {modContainer.Contents.m_WorkshopId}");
+                                ModManager.logger.Warn($"Unable to add remote mod at {modContainer.AssetBundlePath} with workshop ID {modContainer.Contents.m_WorkshopId}");
                             }
                         }
                     }
@@ -142,7 +143,7 @@ namespace ModManager
             string attempt = Process.GetCurrentProcess().StartInfo.FileName;
             if (attempt != null && attempt.Trim().Length > 0)
             {
-                return attempt.Trim();
+                ModManager.logger.Info($"Process filename found: {attempt}. Using args[0] {ModManager.ExecutablePath} anyway because I don't trust it");
             }
             return ModManager.ExecutablePath;
         }
@@ -210,9 +211,18 @@ namespace ModManager
             {
                 ModManager.logger.Info("InitModScripts Hook called");
 
-                // We are assuming this is a Local Mod
-                // It will remain as such until proper dependency management of .dlls is introduced for Official Mods
+                // If we didn't load with the proper parameters, forcibly reprocess everything
+                // We don't expect this to be called at all
+                if (!ModManager.LoadedWithProperParameters)
+                {
+                    ModManager.logger.Fatal("LOADED WITHOUT PROPER PARAMETERS, AND MADE IT TO InitModScripts");
+                }
+
+                // The reprocessing is to pick up all new .dlls in this step (so we never have broken assemblies when all dependencies are present)
                 ModManager.ReprocessOfficialMods();
+
+                ModManager.logger.Info("All mods reprocessed. Determining dependencies");
+                ModManager.ReprocessInitializationOrder();
 
                 ModManager.PatchCustomBlocksIfNeeded();
 

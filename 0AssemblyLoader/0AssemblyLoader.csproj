@@ -37,6 +37,10 @@
       <HintPath>..\..\..\..\Steam\steamapps\common\TerraTech\TerraTechWin64_Data\Managed\Assembly-CSharp.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <Reference Include="DebugWrapper">
+      <HintPath>..\..\..\..\Steam\steamapps\common\TerraTech\TerraTechWin64_Data\Managed\DebugWrapper.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Xml.Linq" />
@@ -45,10 +49,38 @@
     <Reference Include="System.Data" />
     <Reference Include="System.Net.Http" />
     <Reference Include="System.Xml" />
+    <Reference Include="UnityEngine">
+      <HintPath>..\..\..\..\Steam\steamapps\common\TerraTech\TerraTechWin64_Data\Managed\UnityEngine.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>..\..\..\..\Steam\steamapps\common\TerraTech\TerraTechWin64_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ModManagerSetup.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <PropertyGroup>
+    <PostBuildEvent>del *.pdb
+@setlocal enableextensions enabledelayedexpansion
+
+set modpath="E:\steam\steamapps\workshop\content\285920\2655051786\"
+set unitypath="E:\Documents\Unity\Projects\TT Modding\Assets\Mods\0ModManager\"
+
+if not exist !modpath! (
+echo Creating mod folder
+mkdir !modpath!
+)
+
+set e=$(TargetDir)..\&gt;nul
+
+echo Copying to game
+xcopy /S /Y /R "$(TargetFileName)" !modpath!
+
+echo Copying to Unity
+xcopy /S /Y /R "$(TargetFileName)" !unitypath!</PostBuildEvent>
+  </PropertyGroup>
 </Project>

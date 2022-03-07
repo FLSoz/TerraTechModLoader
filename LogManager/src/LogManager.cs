@@ -10,8 +10,36 @@ using NLog.Targets;
 
 namespace LogManager
 {
-    public static class Manager
+    // LogConfig - for when you only need a single output file for the logger
+    public struct LogConfig
     {
+        public string path;
+        public string layout;
+        public LogLevel defaultMinLevel;
+        public bool keepOldFiles;
+    }
+
+    // Target config - defines a target file for logging
+    public struct TargetConfig
+    {
+        public string path;
+        public string layout;
+        public bool keepOldFiles;
+    }
+
+    public struct LogTarget
+    {
+        public FileTarget logFile;
+        public TargetConfig config;
+    }
+
+    public class TTLogManager : ModBase
+    {
+        static TTLogManager()
+        {
+            ModuleInitializer.Run();
+        }
+
         internal static LoggingConfiguration config;
         internal static readonly string TTSteamDir = Path.GetFullPath(Path.Combine(
             AppDomain.CurrentDomain.GetAssemblies()
@@ -28,29 +56,6 @@ namespace LogManager
 
         internal static Dictionary<string, LogLevel> ConfiguredLogLevels = new Dictionary<string, LogLevel>();
         internal static LogLevel ConfiguredGlobalLogLevel = null;
-
-        // LogConfig - for when you only need a single output file for the logger
-        public struct LogConfig
-        {
-            public string path;
-            public string layout;
-            public LogLevel defaultMinLevel;
-            public bool keepOldFiles;
-        }
-
-        // Target config - defines a target file for logging
-        public struct TargetConfig
-        {
-            public string path;
-            public string layout;
-            public bool keepOldFiles;
-        }
-
-        public struct LogTarget
-        {
-            public FileTarget logFile;
-            public TargetConfig config;
-        }
 
         internal static string GetRelativePath(string logPath, string basePath)
         {
@@ -168,6 +173,16 @@ namespace LogManager
             };
             LogTarget logTarget = RegisterLoggingTarget(logger.Name, generatedConfig);
             RegisterLogger(logger, logTarget, logConfig.defaultMinLevel);
+        }
+
+        public override void Init()
+        {
+            return;
+        }
+
+        public override void DeInit()
+        {
+            return;
         }
     }
 }

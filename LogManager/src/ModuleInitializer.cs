@@ -6,20 +6,21 @@ namespace LogManager
 {
     public static class ModuleInitializer
     {
+        public const string VERSION = "1.0.0.1";    // <major version>.<minor version>.<build number>.<revision>
         private static bool Inited = false;
         public static void Run()
         {
-            Console.WriteLine("[LogManager] Initializing logging manager...");
+            Console.WriteLine($"[LogManager] Initializing logging manager version v.{VERSION}...");
 
             if (!Inited)
             {
-                Manager.config = new NLog.Config.LoggingConfiguration();
+                TTLogManager.config = new NLog.Config.LoggingConfiguration();
 
                 // Rules for mapping loggers to targets
                 // Manager.config.AddRule(LogLevel.Error, LogLevel.Fatal, Manager.logconsole);
 
                 // Apply config           
-                NLog.LogManager.Configuration = Manager.config;
+                NLog.LogManager.Configuration = TTLogManager.config;
 
                 // Setup
                 NLog.LogManager.Setup().SetupExtensions(s =>
@@ -27,11 +28,11 @@ namespace LogManager
                     s.AutoLoadAssemblies(false);
                 });
                 NLog.LogManager.Setup().SetupInternalLogger(s =>
-                   s.SetMinimumLogLevel(LogLevel.Trace).LogToFile("NLogInternal.txt")
+                    s.SetMinimumLogLevel(LogLevel.Trace).LogToFile("NLogInternal.txt")
                 );
 
                 // read configuration
-                bool defaultLogging = false; 
+                bool defaultLogging = false;
                 string[] commandLineArgs = CommandLineReader.GetCommandLineArgs();
                 for (int i = 0; i < commandLineArgs.Length; i++)
                 {
@@ -41,13 +42,13 @@ namespace LogManager
                         string argValue = commandLineArgs[i + 1];
                         if (arg.Length == 10) // if it is actually exactly +log_level
                         {
-                            Manager.ConfiguredGlobalLogLevel = LogLevel.FromString(argValue);
+                            TTLogManager.ConfiguredGlobalLogLevel = LogLevel.FromString(argValue);
                         }
                         else if (arg[10] == '_')
                         {
                             string loggerName = arg.Substring(11);
                             LogLevel logLevel = LogLevel.FromString(argValue);
-                            Manager.ConfiguredLogLevels.Add(loggerName, logLevel);
+                            TTLogManager.ConfiguredLogLevels.Add(loggerName, logLevel);
                             Console.WriteLine($"Detected logging config of {logLevel} for logger {loggerName}");
                         }
                     }

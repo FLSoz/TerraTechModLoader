@@ -30,6 +30,11 @@ namespace ModManager
     //  - these will always be loaded properly in the end
     public class ModManager : ModBase
     {
+        static ModManager()
+        {
+            ModuleInitializer.Run();
+        }
+
         internal static bool EnableTTQMMHandling = false;
         private static bool patchedAssemblyLoading = false;
         private static bool patched = false;
@@ -53,13 +58,13 @@ namespace ModManager
         internal static NLog.Logger logger = NLog.LogManager.GetLogger("ModManager");
         public static void ConfigureLogger()
         {
-            Manager.LogConfig config = new Manager.LogConfig
+            LogManager.LogConfig config = new LogManager.LogConfig
             {
                 layout = "${longdate} | ${level:uppercase=true:padding=-5:alignmentOnTruncation=left} | ${logger:shortName=true} | ${message}  ${exception}",
                 keepOldFiles = false,
-                defaultMinLevel = LogLevel.Trace
+                defaultMinLevel = LogLevel.Debug
             };
-            Manager.RegisterLogger(logger, config);
+            TTLogManager.RegisterLogger(logger, config);
         }
 
         internal static Harmony harmony = new Harmony(HarmonyID);
@@ -559,7 +564,7 @@ namespace ModManager
             return "Loaded in " + elapsedTime;
         }
 
-        private static string[] KNOWN_ASSEMBLIES = { "0Harmony", "NLog", "LogManager", "ModManager" };
+        private static string[] KNOWN_ASSEMBLIES = { "0Harmony", "NLog", "NLogManager", "TTModManager" };
 
         /// <summary>
         /// Handle loading of Assembly by specified ModContainer
@@ -570,7 +575,7 @@ namespace ModManager
         {
             ModContents contents = modContainer.Contents;
             PublishedFileId_t workshopID = contents.m_WorkshopId;
-            bool isWorkshop = workshopID != PublishedFileId_t.Invalid;
+            bool isWorkshop = workshopID != PublishedFileId_t.Invalid && !modContainer.Local;
             string localString = isWorkshop ? "WORKSHOP" : "LOCAL";
 
             logger.Debug("Processing assembly {Assembly}", assembly.FullName);
@@ -640,6 +645,7 @@ namespace ModManager
             return null;
         }
 
+        // We no longer need to forcibly reprocess everything, since we've added hooks into the loading of mods
         /// <summary>
         /// Handle processing of all Official mods. Will detect everything in the mod list, determine dependency relationships based on reflection, and setup the load queue.
         /// </summary>
@@ -713,11 +719,13 @@ namespace ModManager
             }
             CurrentOperationSpecifics = null;
             CurrentOperation = null;
-            logger.Info("All mods reprocessed. Determining dependencies");
+        }
 
+        public static void ReprocessInitializationOrder()
+        {
             // Process the correct load order of EarlyInits
             logger.Info("Building EarlyInit dependency graph");
-            EarlyInitQueue = ProcessOrder((IManagedMod mod) => {return mod.earlyLoadBefore;}, (IManagedMod mod) => {return mod.earlyLoadAfter;});
+            EarlyInitQueue = ProcessOrder((IManagedMod mod) => { return mod.earlyLoadBefore; }, (IManagedMod mod) => { return mod.earlyLoadAfter; });
             logger.Info("EarlyInit Mod Queue: ");
             foreach (WrappedMod mod in EarlyInitQueue)
             {

@@ -8,53 +8,57 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using ModManager.Datastructures;
 
-public static class ModuleInitializer
+namespace ModManager
 {
-    private static bool Inited = false;
-
-    public static void Run()
+    public static class ModuleInitializer
     {
-        if (!Inited)
+        public const string VERSION = "1.0.0.2";    // <major version>.<minor version>.<build number>.<revision>
+        private static bool Inited = false;
+
+        public static void Run()
         {
-            Console.WriteLine("[0ModManager] Initializing manager...");
-
-            // Configure all loggers
-            ModManager.ModManager.ConfigureLogger();
-            ModManager.QMod.ConfigureLogger();
-            DependencyGraph<ModManager.QMod>.ConfigureLogger();
-            DependencyGraph<Type>.ConfigureLogger();
-
-            ModManager.ModManager.PatchAssemblyLoading();
-            // TODO: Add assembly initialization logic.
-            ModManager.ModManager.Patch();
-            ModManager.ModManager.logger.Info("Assembly Initialization Complete");
-
-            // Allow debug settings to happen even in normal operation
-            string[] commandLineArgs = CommandLineReader.GetCommandLineArgs();
-            ModManager.ModManager.logger.Info($"Running game with params: {String.Join(" ", commandLineArgs)}");
-            for (int i = 0; i < commandLineArgs.Length; i++)
+            if (!Inited)
             {
-                if (i == 0)
-                {
-                    ModManager.ModManager.ExecutablePath = commandLineArgs[i];
-                    ModManager.ModManager.logger.Info($"Backup executable path: {ModManager.ModManager.ExecutablePath}");
-                }
+                Console.WriteLine($"[0ModManager] Initializing mod manager v.{VERSION}...");
 
-                if (commandLineArgs[i] == "+manage_ttmm")
+                // Configure all loggers
+                ModManager.ConfigureLogger();
+                QMod.ConfigureLogger();
+                DependencyGraph<QMod>.ConfigureLogger();
+                DependencyGraph<Type>.ConfigureLogger();
+
+                ModManager.PatchAssemblyLoading();
+                // TODO: Add assembly initialization logic.
+                ModManager.Patch();
+                ModManager.logger.Info("Assembly Initialization Complete");
+
+                // Allow debug settings to happen even in normal operation
+                string[] commandLineArgs = CommandLineReader.GetCommandLineArgs();
+                ModManager.logger.Info($"Running game with params: {String.Join(" ", commandLineArgs)}");
+                for (int i = 0; i < commandLineArgs.Length; i++)
                 {
-                    ModManager.ModManager.EnableTTQMMHandling = true;
-                    ModManager.ModManager.ProcessUnofficialMods();
+                    if (i == 0)
+                    {
+                        ModManager.ExecutablePath = commandLineArgs[i];
+                        ModManager.logger.Info($"Backup executable path: {ModManager.ExecutablePath}");
+                    }
+
+                    if (commandLineArgs[i] == "+manage_ttmm")
+                    {
+                        ModManager.EnableTTQMMHandling = true;
+                        ModManager.ProcessUnofficialMods();
+                    }
+                    else if (commandLineArgs[i] == "+harmony_debug")
+                    {
+                        ModManager.SetHarmonyDebug();
+                    }
+                    else if (commandLineArgs[i] == "+custom_mod_list")
+                    {
+                        ModManager.RequestConfiguredModSession();
+                    }
                 }
-                else if (commandLineArgs[i] == "+harmony_debug")
-                {
-                    ModManager.ModManager.SetHarmonyDebug();
-                }
-                else if (commandLineArgs[i] == "+custom_mod_list")
-                {
-                    ModManager.ModManager.RequestConfiguredModSession();
-                }
+                Inited = true;
             }
-            Inited = true;
         }
     }
 }

@@ -17,15 +17,15 @@ namespace LogManager
         {
             harmony.PatchAll();
 
-            Manager.TargetConfig targetConfig = new Manager.TargetConfig {
+            LogManager.TargetConfig targetConfig = new LogManager.TargetConfig {
                 layout = "${longdate} | ${level:uppercase=true:padding=-5:alignmentOnTruncation=left} | ${message}  ${exception}"
             };
 
             // create a logger that writes to /Logs/output.log
-            Manager.LogTarget target = Manager.RegisterLoggingTarget("output", targetConfig);
+            LogTarget target = TTLogManager.RegisterLoggingTarget("output", targetConfig);
             logger = NLog.LogManager.GetLogger("vanilla");
-            LogLevel minLevel = Manager.ConfiguredGlobalLogLevel != null ? Manager.ConfiguredGlobalLogLevel : LogLevel.Info;
-            Manager.RegisterLogger(logger, target, minLevel);
+            LogLevel minLevel = TTLogManager.ConfiguredGlobalLogLevel != null ? TTLogManager.ConfiguredGlobalLogLevel : LogLevel.Info;
+            TTLogManager.RegisterLogger(logger, target, minLevel);
         }
 
         internal static string FormatMessage(string message, string intermediary = "")
