@@ -131,6 +131,14 @@ namespace ModManager
         {
             logger.Info("ModManager EarlyInit fired");
             Patch();
+            if (!LoadedWithProperParameters)
+            {
+                Dictionary<string, ModContainer> mods = (Dictionary<string, ModContainer>)ReflectedManMods.m_Mods.GetValue(Singleton.Manager<ManMods>.inst);
+                if (mods.Count >= Constants.kNumUGCResultsPerPage)
+                {
+                    WorkshopLoader.SubscribedModsPatch.CheckForMoreSteamMods(2u);
+                }
+            }
         }
 
         internal static void SetHarmonyDebug()

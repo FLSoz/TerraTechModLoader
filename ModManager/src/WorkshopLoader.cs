@@ -120,60 +120,56 @@ namespace ModManager
 
 
 		// Patch for Steam mod fetching - Included from Community Patch
+		[HarmonyPatch(typeof(ManMods), "OnSteamModsFetchComplete")]
 		internal static class SubscribedModsPatch
 		{
-			[HarmonyPatch(typeof(ManMods), "OnSteamModsFetchComplete")]
-			internal static class PatchOnSteamModsFetchComplete
+			internal const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
+			internal static FieldInfo m_SteamQuerySubscribedOp = typeof(ManMods).GetField("m_SteamQuerySubscribedOp", flags);
+			internal static FieldInfo m_WaitingOnDownloads = typeof(ManMods).GetField("m_WaitingOnDownloads", flags);
+			internal static FieldInfo m_WaitingOnWorkshopCheck = typeof(ManMods).GetField("m_WaitingOnWorkshopCheck", flags);
+			internal static MethodInfo LoadWorkshopData = typeof(ManMods).GetMethod("LoadWorkshopData", flags);
+
+			internal static void CheckForMoreSteamMods(uint page)
 			{
-				internal const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
-				internal static FieldInfo m_SteamQuerySubscribedOp = typeof(ManMods).GetField("m_SteamQuerySubscribedOp", flags);
-				internal static FieldInfo m_WaitingOnDownloads = typeof(ManMods).GetField("m_WaitingOnDownloads", flags);
-				internal static FieldInfo m_WaitingOnWorkshopCheck = typeof(ManMods).GetField("m_WaitingOnWorkshopCheck", flags);
-				internal static MethodInfo LoadWorkshopData = typeof(ManMods).GetMethod("LoadWorkshopData", flags);
+				Console.WriteLine($"[CommunityPatch] Attempting to fetch page {page} of subscribed mods");
+				ManMods manMods = Singleton.Manager<ManMods>.inst;
+				m_WaitingOnWorkshopCheck.SetValue(manMods, false);
+				SteamDownloadData nextData = SteamDownloadData.Create(SteamItemCategory.Mods, page);
+				CommandOperation<SteamDownloadData> operation = (CommandOperation<SteamDownloadData>)m_SteamQuerySubscribedOp.GetValue(manMods);
+				operation.Execute(nextData);
+			}
 
-				internal static void CheckForMoreSteamMods(uint page)
+			[HarmonyPrefix]
+			internal static bool Prefix(SteamDownloadData data)
+			{
+				// We're assuming Workshop is enabled if this has been called
+				Console.WriteLine("[CommunityPatch] Received query resonse from Steam");
+				if (data.HasAnyItems)
 				{
-					Console.WriteLine($"[CommunityPatch] Attempting to fetch page {page} of subscribed mods");
-					ManMods manMods = Singleton.Manager<ManMods>.inst;
-					m_WaitingOnWorkshopCheck.SetValue(manMods, false);
-					SteamDownloadData nextData = SteamDownloadData.Create(SteamItemCategory.Mods, page);
-					CommandOperation<SteamDownloadData> operation = (CommandOperation<SteamDownloadData>)m_SteamQuerySubscribedOp.GetValue(manMods);
-					operation.Execute(nextData);
-				}
-
-				[HarmonyPrefix]
-				internal static bool Prefix(SteamDownloadData data)
-				{
-					// We're assuming Workshop is enabled if this has been called
-					Console.WriteLine("[CommunityPatch] Received query resonse from Steam");
-					if (data.HasAnyItems)
+					if (data.m_Items.Count >= Constants.kNumUGCResultsPerPage)
 					{
-						if (data.m_Items.Count >= Constants.kNumUGCResultsPerPage)
+						ManMods manMods = Singleton.Manager<ManMods>.inst;
+
+						List<PublishedFileId_t> waitingOnDownloadList = (List<PublishedFileId_t>)m_WaitingOnDownloads.GetValue(manMods);
+						for (int i = 0; i < data.m_Items.Count; i++)
 						{
-							ManMods manMods = Singleton.Manager<ManMods>.inst;
-
-							List<PublishedFileId_t> waitingOnDownloadList = (List<PublishedFileId_t>)m_WaitingOnDownloads.GetValue(manMods);
-							for (int i = 0; i < data.m_Items.Count; i++)
-							{
-								SteamDownloadItemData steamDownloadItemData = data.m_Items[i];
-								waitingOnDownloadList.Add(steamDownloadItemData.m_Details.m_nPublishedFileId);
-								LoadWorkshopData.Invoke(manMods, new object[] { steamDownloadItemData, false });
-							}
-
-							uint currPage = data.m_Page;
-							CheckForMoreSteamMods(currPage + 1);
-							return false;
+							SteamDownloadItemData steamDownloadItemData = data.m_Items[i];
+							waitingOnDownloadList.Add(steamDownloadItemData.m_Details.m_nPublishedFileId);
+							LoadWorkshopData.Invoke(manMods, new object[] { steamDownloadItemData, false });
 						}
-						Console.WriteLine($"[CommunityPatch] Found {data.m_Items.Count}, assuming there's no more");
+
+						uint currPage = data.m_Page;
+						CheckForMoreSteamMods(currPage + 1);
+						return false;
 					}
-					else
-					{
-						Console.WriteLine("[CommunityPatch] NO mods found");
-					}
-					return true;
+					Console.WriteLine($"[CommunityPatch] Found {data.m_Items.Count}, assuming there's no more");
 				}
+				else
+				{
+					Console.WriteLine("[CommunityPatch] NO mods found");
+				}
+				return true;
 			}
 		}
-
 	}
 }

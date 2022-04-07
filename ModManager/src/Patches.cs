@@ -393,6 +393,7 @@ namespace ModManager
             }
         }
 
+        // Patches carried on from TTMM
         internal static class TTMMPatches
         {
             [HarmonyLib.HarmonyPatch(typeof(UIScreenBugReport), "Set")]
