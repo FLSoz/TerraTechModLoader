@@ -22,7 +22,8 @@ namespace ModManager
 		internal static void OnAnyItemDownloaded(DownloadItemResult_t result)
         {
 			if (workshopToCommandMap.TryGetValue(result.m_nPublishedFileId, out SteamItemWaitForDownloadCommand appropriateCommand))
-            {
+			{
+				ModManager.logger.Trace("Workshop mod {workshopID} has been downloaded", result.m_nPublishedFileId);
 				OnItemDownloaded.Invoke(appropriateCommand, new object[] { result });
             }
         }

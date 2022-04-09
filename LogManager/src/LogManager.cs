@@ -137,7 +137,7 @@ namespace LogManager
 
             if (ConfiguredLogLevels.TryGetValue(logger.Name, out LogLevel configuredLevel) && configuredLevel != null)
             {
-                Console.WriteLine($"Registering logger {logger.Name} with logging level {configuredLevel}");
+                Console.WriteLine($"Registering logger {logger.Name} with logging level {configuredLevel} at {target.config.path}");
                 minLevel = configuredLevel;
             }
             else
@@ -145,17 +145,17 @@ namespace LogManager
                 string shortLoggerName = logger.Name.Substring(logger.Name.LastIndexOf('.') + 1);
                 if (ConfiguredLogLevels.TryGetValue(shortLoggerName, out configuredLevel) && configuredLevel != null)
                 {
-                    Console.WriteLine($"Registering logger {shortLoggerName} with logging level {configuredLevel}");
+                    Console.WriteLine($"Registering logger {shortLoggerName} with logging level {configuredLevel} at {target.config.path}");
                     minLevel = configuredLevel;
                 }
                 else if (ConfiguredGlobalLogLevel != null)
                 {
-                    Console.WriteLine($"Registering logger {shortLoggerName} with GLOBAL DEFAULT logging level {ConfiguredGlobalLogLevel}");
+                    Console.WriteLine($"Registering logger {shortLoggerName} with GLOBAL DEFAULT logging level {ConfiguredGlobalLogLevel} at {target.config.path}");
                     minLevel = ConfiguredGlobalLogLevel;
                 }
                 else
                 {
-                    Console.WriteLine($"Registering logger {shortLoggerName} with default logging level {minLevel}");
+                    Console.WriteLine($"Registering logger {shortLoggerName} with default logging level {minLevel} at {target.config.path}");
                 }
             }
 

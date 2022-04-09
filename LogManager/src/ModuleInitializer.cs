@@ -27,9 +27,6 @@ namespace LogManager
                 {
                     s.AutoLoadAssemblies(false);
                 });
-                NLog.LogManager.Setup().SetupInternalLogger(s =>
-                    s.SetMinimumLogLevel(LogLevel.Trace).LogToFile("NLogInternal.txt")
-                );
 
                 // read configuration
                 bool defaultLogging = false;

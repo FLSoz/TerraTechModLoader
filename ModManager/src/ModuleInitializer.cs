@@ -45,6 +45,7 @@ namespace ModManager
 
                     if (commandLineArgs[i] == "+manage_ttmm")
                     {
+                        ModManager.logger.Info($"Enabling TTQMM handling");
                         ModManager.EnableTTQMMHandling = true;
                         ModManager.ProcessUnofficialMods();
                     }

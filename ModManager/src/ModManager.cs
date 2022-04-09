@@ -40,7 +40,7 @@ namespace ModManager
         private static bool patched = false;
         internal static bool LoadedWithProperParameters = false;
         internal const string HarmonyID = "com.flsoz.ttmodding.modmanager";
-        internal static PublishedFileId_t WorkshopID = new PublishedFileId_t(2655051786);
+        internal static PublishedFileId_t WorkshopID = new PublishedFileId_t(2790161231);
         internal static string ExecutablePath;
 
         internal static readonly string TTSteamDir = Path.GetFullPath(Path.Combine(
@@ -189,7 +189,7 @@ namespace ModManager
                                             },
                                             false);
                                             // We enforce that this is not remote
-                                            logger.Info("Loading workshop mod {WorkshopID}", workshopID);
+                                            logger.Info("Loading workshop mod {WorkshopID}", steamWorkshopID);
                                         }
                                         else
                                         {
@@ -202,7 +202,6 @@ namespace ModManager
                                     }
                                     break;
                                 case "ttqmm":
-                                    EnableTTQMMHandling = true;
                                     logger.Error("Attempted to load mod {Mod} from TTMM. This is currently unsupported", modName);
                                     break;
                                 default:
@@ -224,6 +223,7 @@ namespace ModManager
 
         internal static bool TryFindAssembly(ModContainer mod, string name, out Assembly assembly)
         {
+            ModManager.logger.Trace("Checking if mod {mod} with bundle at {path} has {assembly}", mod.ModID, mod.AssetBundlePath, name);
             assembly = null;
             ModContents contents = mod.Contents;
 
@@ -243,7 +243,7 @@ namespace ModManager
             {
                 if (name.Contains(Path.GetFileNameWithoutExtension(dll.Name)))
                 {
-                    logger.Info("Found assembly {assembly}", name);
+                    ModManager.logger.Trace("Found assembly {assembly} at path {path}", name, dll.FullName);
                     assembly = Assembly.LoadFrom(dll.FullName);
                     return true;
                 }
@@ -300,12 +300,12 @@ namespace ModManager
                                             && !(bool)isEnabled
                                         )
                                         {
-                                            logger.Warn("Found assembly {Assembly}, but it's marked as DISABLED", dll.Name);
+                                            logger.Warn("Found QMod assembly {Assembly}, but it's marked as DISABLED", dll.Name);
                                             return false;
                                         }
                                         else
                                         {
-                                            logger.Info("Found assembly {Assembly}, marked as ENABLED", dll.Name);
+                                            logger.Info("Found QMod assembly {Assembly}, marked as ENABLED", dll.Name);
                                         }
                                     }
                                     catch
@@ -324,7 +324,7 @@ namespace ModManager
                         {
                             if (args.Name.Contains(Path.GetFileNameWithoutExtension(dll.Name)))
                             {
-                                logger.Info("Found assembly {assembly}", args.Name);
+                                logger.Info("Found QMod assembly {assembly}", args.Name);
                                 return Assembly.LoadFrom(dll.FullName);
                             }
                         }
@@ -697,7 +697,7 @@ namespace ModManager
                     foreach (FileInfo fileInfo in parentDirectory.EnumerateFiles())
                     {
                         // Ignore loading ModManager
-                        if (fileInfo.Extension == ".dll" && !fileInfo.Name.Contains("ModManager"))
+                        if (fileInfo.Extension == ".dll" && !fileInfo.Name.Contains("ModManager") && !fileInfo.Name.Contains("AssemblyLoader") && !fileInfo.Name.Contains("NLog"))
                         {
                             Assembly assembly = Assembly.LoadFrom(fileInfo.FullName);
                             logger.Trace($"Checking dll ${fileInfo.FullName}");

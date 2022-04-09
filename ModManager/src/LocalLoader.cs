@@ -22,9 +22,7 @@ namespace ModManager
 				ModManager.logger.Info("Found mod in {ModFolder}. Resolved name as {ModName}", modPath, localModName);
 				ModContainer modContainer = new ModContainer(localModName, string.Concat(new string[]
 				{
-					ManMods.LocalModsDirectory,
-					"/",
-					localModName,
+					modPath,
 					"/",
 					localModName,
 					"_bundle"

@@ -20,6 +20,16 @@ namespace ModManager
     {
         internal static bool RequiresRestart = false;
 
+        [HarmonyPatch(typeof(JSONBlockLoader), "RegisterModuleLoader")]
+        public static class PatchModuleRegistration
+        {
+            [HarmonyPrefix]
+            internal static void Prefix(JSONModuleLoader loader)
+            {
+                ModManager.logger.Info($"Trying to register loader {loader.GetModuleKey()}");
+            }
+        }
+
         /// <summary>
         /// Patch Lobby filtering to only show lobbies that also have 0ModManager
         /// </summary>
@@ -280,7 +290,7 @@ namespace ModManager
                     AssetBundle bundle = createRequest.assetBundle;
                     if (bundle == null)
                     {
-                        ModManager.logger.Error("Load AssetBundle failed for mod {Mod}", container.ModID);
+                        ModManager.logger.Error("Load AssetBundle at path {Path} failed for mod {Mod}", container.AssetBundlePath, container.ModID);
                         container.OnLoadFailed();
                         yield return 1f;
                     }

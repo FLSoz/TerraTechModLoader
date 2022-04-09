@@ -32,6 +32,7 @@ namespace ModManager
 
         public static ManagedMod FromMod(Type mod)
         {
+            ModManager.logger.Trace($"Setting up ManagedMod for type {mod}");
             FieldInfo _LoadOrder = mod.GetField("LoadOrder", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
             MethodInfo _GetLoadAfter = mod.GetMethod("LoadAfter", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
             MethodInfo _GetLoadBefore = mod.GetMethod("LoadBefore", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);

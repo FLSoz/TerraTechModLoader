@@ -94,10 +94,12 @@ namespace ModManager
         {
             if (this.managedMod != null)
             {
+                ModManager.logger.Trace("Running Init for MANAGED Mod {Mod}", Name);
                 this.managedMod.Init();
             }
             else
             {
+                ModManager.logger.Trace("Running Init for NON-MANAGED Mod {Mod}", Name);
                 this.officialMod.Init();
             }
         }

@@ -67,7 +67,7 @@
     <PostBuildEvent>del *.pdb
 @setlocal enableextensions enabledelayedexpansion
 
-set modpath="E:\steam\steamapps\workshop\content\285920\2655051786\"
+set modpath="E:\Steam\steamapps\workshop\content\285920\2790161231\"
 set unitypath="E:\Documents\Unity\Projects\TT Modding\Assets\Mods\0ModManager\"
 
 if not exist !modpath! (
