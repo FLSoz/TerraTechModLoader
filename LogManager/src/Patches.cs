@@ -11,7 +11,6 @@ namespace LogManager
         internal const string HarmonyID = "com.flsoz.ttmodding.logmanager";
         internal static Harmony harmony = new Harmony(HarmonyID);
         internal static Logger logger;
-        internal static bool EnableVanillaLogs = false;
 
         internal static void Init()
         {
@@ -64,7 +63,7 @@ namespace LogManager
                 {
                     logger.Info(message);
                 }
-                return EnableVanillaLogs;
+                return TTLogManager.EnableVanillaLogs;
             }
         }
 
@@ -82,7 +81,7 @@ namespace LogManager
                 {
                     logger.Info(message);
                 }
-                return EnableVanillaLogs;
+                return TTLogManager.EnableVanillaLogs;
             }
         }
 
@@ -100,7 +99,7 @@ namespace LogManager
                 {
                     logger.Warn(message);
                 }
-                return EnableVanillaLogs;
+                return TTLogManager.EnableVanillaLogs;
             }
         }
 
@@ -118,7 +117,7 @@ namespace LogManager
                 {
                     logger.Warn(message);
                 }
-                return EnableVanillaLogs;
+                return TTLogManager.EnableVanillaLogs;
             }
         }
 
@@ -140,7 +139,7 @@ namespace LogManager
                     FormatMessageWithCallstack(ref callstack);
                     logger.Error("{}{}", message, callstack);
                 }
-                return EnableVanillaLogs;
+                return TTLogManager.EnableVanillaLogs;
             }
         }
 
@@ -162,7 +161,7 @@ namespace LogManager
                     FormatMessageWithCallstack(ref callstack);
                     logger.Error("{}{}", message, callstack);
                 }
-                return EnableVanillaLogs;
+                return TTLogManager.EnableVanillaLogs;
             }
         }
 
@@ -173,7 +172,7 @@ namespace LogManager
             internal static bool Prefix(Exception exception)
             {
                 logger.Fatal(exception);
-                return EnableVanillaLogs;
+                return TTLogManager.EnableVanillaLogs;
             }
         }
 
@@ -184,7 +183,7 @@ namespace LogManager
             internal static bool Prefix(Exception exception)
             {
                 logger.Fatal(exception);
-                return EnableVanillaLogs;
+                return TTLogManager.EnableVanillaLogs;
             }
         }
 
@@ -195,7 +194,7 @@ namespace LogManager
             internal static bool Prefix(string format, params object[] args)
             {
                 logger.Info(FormatMessage(format), args);
-                return EnableVanillaLogs;
+                return TTLogManager.EnableVanillaLogs;
             }
         }
 
@@ -206,7 +205,7 @@ namespace LogManager
             internal static bool Prefix(string format, params object[] args)
             {
                 logger.Info(FormatMessage(format), args);
-                return EnableVanillaLogs;
+                return TTLogManager.EnableVanillaLogs;
             }
         }
 
@@ -217,7 +216,7 @@ namespace LogManager
             internal static bool Prefix(string format, params object[] args)
             {
                 logger.Warn(FormatMessage(format), args);
-                return EnableVanillaLogs;
+                return TTLogManager.EnableVanillaLogs;
             }
         }
 
@@ -228,7 +227,7 @@ namespace LogManager
             internal static bool Prefix(string format, params object[] args)
             {
                 logger.Warn(FormatMessage(format), args);
-                return EnableVanillaLogs;
+                return TTLogManager.EnableVanillaLogs;
             }
         }
 
@@ -241,7 +240,7 @@ namespace LogManager
                 string message = FormatMessage(String.Format(format, args));
                 FormatMessageWithCallstack(ref message);
                 logger.Error(message);
-                return EnableVanillaLogs;
+                return TTLogManager.EnableVanillaLogs;
             }
         }
 
@@ -254,7 +253,7 @@ namespace LogManager
                 string message = FormatMessage(String.Format(format, args));
                 FormatMessageWithCallstack(ref message);
                 logger.Error(message);
-                return EnableVanillaLogs;
+                return TTLogManager.EnableVanillaLogs;
             }
         }
 
@@ -276,7 +275,7 @@ namespace LogManager
                     FormatMessageWithCallstack(ref callstack);
                     logger.Debug("ASSERT | {}{}", message, callstack);
                 }
-                return EnableVanillaLogs;
+                return TTLogManager.EnableVanillaLogs;
             }
         }
 
@@ -298,7 +297,7 @@ namespace LogManager
                     FormatMessageWithCallstack(ref callstack);
                     logger.Debug("ASSERT | {}{}", message, callstack);
                 }
-                return EnableVanillaLogs;
+                return TTLogManager.EnableVanillaLogs;
             }
         }
 
@@ -314,7 +313,7 @@ namespace LogManager
                     FormatMessageWithCallstack(ref message);
                     logger.Error(message);
                 }
-                return EnableVanillaLogs;
+                return TTLogManager.EnableVanillaLogs;
             }
         }
 
@@ -330,7 +329,7 @@ namespace LogManager
                     FormatMessageWithCallstack(ref callstack);
                     logger.Error("{}{}", FormatMessage(errorMessage, "ASSERT FAILED"), callstack);
                 }
-                return EnableVanillaLogs;
+                return TTLogManager.EnableVanillaLogs;
             }
         }
 
@@ -346,7 +345,7 @@ namespace LogManager
                     FormatMessageWithCallstack(ref callstack);
                     logger.Error("{}{}", FormatMessage(errorMessage, "ASSERT FAILED"), callstack);
                 }
-                return EnableVanillaLogs;
+                return TTLogManager.EnableVanillaLogs;
             }
         }
 
@@ -362,7 +361,7 @@ namespace LogManager
                     FormatMessageWithCallstack(ref callstack);
                     logger.Error("{}{}", FormatMessage(String.Format(format, args), "ASSERT FAILED"), callstack);
                 }
-                return EnableVanillaLogs;
+                return TTLogManager.EnableVanillaLogs;
             }
         }
 
@@ -378,7 +377,7 @@ namespace LogManager
                     FormatMessageWithCallstack(ref callstack);
                     logger.Error("{}{}", FormatMessage(String.Format(format, args), "ASSERT FAILED"), callstack);
                 }
-                return EnableVanillaLogs;
+                return TTLogManager.EnableVanillaLogs;
             }
         }
     }

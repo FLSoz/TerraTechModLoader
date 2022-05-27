@@ -55,7 +55,7 @@ namespace LogManager
                     }
                     else if (arg == "+enable_vanilla_logs")
                     {
-                        Patches.EnableVanillaLogs = true;
+                        TTLogManager.EnableVanillaLogs = true;
                     }
                 }
 

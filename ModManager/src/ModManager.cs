@@ -160,7 +160,7 @@ namespace ModManager
                     {
                         logger.Info($"Processing mod {mod}");
                         string trimmedMod = mod.Trim(new char[] { '[', ']', ' ' });
-                        string[] modDescrip = trimmedMod.Split(new char[] { ':' });
+                        string[] modDescrip = trimmedMod.Split(new char[] { ':' }, 2);
                         if (modDescrip.Length == 2)
                         {
                             string type = modDescrip[0];

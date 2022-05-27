@@ -41,6 +41,7 @@ namespace LogManager
         }
 
         internal static LoggingConfiguration config;
+        internal static bool EnableVanillaLogs = false;
         internal static readonly string TTSteamDir = Path.GetFullPath(Path.Combine(
             AppDomain.CurrentDomain.GetAssemblies()
             .Where(assembly => assembly.GetName().Name == "Assembly-CSharp").First().Location
@@ -159,6 +160,10 @@ namespace LogManager
                 }
             }
 
+            if (EnableVanillaLogs)
+            {
+                config.AddRule(minLevel, LogLevel.Fatal, logconsole, logger.Name);
+            }
             config.AddRule(minLevel, LogLevel.Fatal, target.logFile, logger.Name);
             NLog.LogManager.Configuration = config;
         }
