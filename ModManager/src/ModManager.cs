@@ -217,8 +217,8 @@ namespace ModManager
             // We explicitly loaded only this mod. 
             logger.Info("No custom mod list found - getting default mod loading behaviour");
             ManMods manMods = Singleton.Manager<ManMods>.inst;
-            typeof(ManMods).GetMethod("CheckForLocalMods", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public).Invoke(manMods, null);
-            typeof(ManMods).GetMethod("CheckForSteamWorkshopMods", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public).Invoke(manMods, null);
+            typeof(ManMods).GetMethod("CheckForLocalMods", Patches.InstanceFlags).Invoke(manMods, null);
+            typeof(ManMods).GetMethod("CheckForSteamWorkshopMods", Patches.InstanceFlags).Invoke(manMods, null);
         }
 
         internal static bool TryFindAssembly(ModContainer mod, string name, out Assembly assembly)
@@ -761,7 +761,7 @@ namespace ModManager
             MethodInfo AddTechComponentToPrefab = BlockLoader
                 .GetMethod(
                     "AddTechComponentToPrefab",
-                    BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic,
+                    Patches.StaticFlags,
                     null,
                     new Type[] { typeof(Type) },
                     null
@@ -771,12 +771,12 @@ namespace ModManager
             logger.Debug("Patched TechPhysicsReset component");
             #endregion
 
-            Type Patches = BlockLoader.GetNestedTypes(BindingFlags.Static | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).Where(type => type.Name == "Patches").First();
+            Type BlockInjectorPatches = BlockLoader.GetNestedTypes(BindingFlags.Static | Patches.InstanceFlags).Where(type => type.Name == "Patches").First();
             #region 1.4.0.1+ Patches
-            Type OfficialBlocks = Patches.GetNestedTypes(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic).Where(type => type.Name == "OfficialBlocks").First();
+            Type OfficialBlocks = BlockInjectorPatches.GetNestedTypes(Patches.StaticFlags).Where(type => type.Name == "OfficialBlocks").First();
             MethodInfo Patch = OfficialBlocks.GetMethod(
                 "Patch",
-                    BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic,
+                    Patches.StaticFlags,
                     null,
                     new Type[] { typeof(Harmony) },
                     null
@@ -788,22 +788,22 @@ namespace ModManager
             #region Miscellaneous Patches
             try
             {
-                Type Projectile_UnlockColliderQuantity = Patches.GetNestedTypes(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic).Where(type => type.Name == "Projectile_UnlockColliderQuantity").First();
-                blockInjectorHarmony.Patch(typeof(Projectile).GetMethod("PrePool", BindingFlags.NonPublic | BindingFlags.Instance), null, null, transpiler: new HarmonyMethod(Projectile_UnlockColliderQuantity.GetMethod("Transpiler", BindingFlags.Static | BindingFlags.NonPublic)));
+                Type Projectile_UnlockColliderQuantity = BlockInjectorPatches.GetNestedTypes(Patches.StaticFlags).Where(type => type.Name == "Projectile_UnlockColliderQuantity").First();
+                blockInjectorHarmony.Patch(typeof(Projectile).GetMethod("PrePool", Patches.InstanceFlags), null, null, transpiler: new HarmonyMethod(Projectile_UnlockColliderQuantity.GetMethod("Transpiler", Patches.StaticFlags)));
             }
             catch (Exception E)
             {
                 logger.Error(E, "Error while patching custom blocks");
             }
 
-            typeof(ManCustomSkins).GetMethod("Awake", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).Invoke(Singleton.Manager<ManCustomSkins>.inst, Array.Empty<object>());
+            typeof(ManCustomSkins).GetMethod("Awake", Patches.InstanceFlags).Invoke(Singleton.Manager<ManCustomSkins>.inst, Array.Empty<object>());
             #endregion
             logger.Info("BlockInjector Patches complete");
         }
         private static void RunBlockInjector()
         {
             Type DirectoryBlockLoader = BlockInjector.LoadedAssembly.GetType("Nuterra.BlockInjector.DirectoryBlockLoader");
-            MethodInfo method = DirectoryBlockLoader.GetMethod("LoadBlocks", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+            MethodInfo method = DirectoryBlockLoader.GetMethod("LoadBlocks", Patches.StaticFlags);
             // load resources
             IEnumerator<object> resources = (IEnumerator<object>) method.Invoke(null, new object[] { true, false });
             while (resources.MoveNext())
@@ -839,7 +839,7 @@ namespace ModManager
         }
 
 
-        public static readonly FieldInfo InjectedEarlyHooks = typeof(ModContainer).GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).FirstOrDefault(field =>
+        public static readonly FieldInfo InjectedEarlyHooks = typeof(ModContainer).GetFields(Patches.InstanceFlags).FirstOrDefault(field =>
                 field.CustomAttributes.Any(attr => attr.AttributeType == typeof(CompilerGeneratedAttribute)) &&
                 (field.DeclaringType == typeof(ModContainer).GetProperty("InjectedEarlyHooks").DeclaringType) &&
                 field.FieldType.IsAssignableFrom(typeof(ModContainer).GetProperty("InjectedEarlyHooks").PropertyType) &&

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -19,6 +20,8 @@ namespace ModManager
     public static class Patches
     {
         internal static bool RequiresRestart = false;
+        internal const BindingFlags InstanceFlags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
+        internal const BindingFlags StaticFlags = BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
 
         [HarmonyPatch(typeof(JSONBlockLoader), "RegisterModuleLoader")]
         public static class PatchModuleRegistration
@@ -27,6 +30,25 @@ namespace ModManager
             internal static void Prefix(JSONModuleLoader loader)
             {
                 ModManager.logger.Info($"Trying to register loader {loader.GetModuleKey()}");
+            }
+        }
+
+        /// <summary>
+        /// Patch module registration so that we only have modules from the current session available
+        /// </summary>
+        [HarmonyPatch(typeof(ManMods), "PurgeModdedContentFromGame")]
+        public static class PatchModuleDeregistration
+        {
+            internal static readonly FieldInfo sLoaders = typeof(JSONBlockLoader).GetField("sLoaders", StaticFlags);
+            [HarmonyPostfix]
+            internal static void Postfix(ref ModSessionInfo oldSessionInfo)
+            {
+                if (oldSessionInfo != null)
+                {
+                    Dictionary<string, JSONModuleLoader> allLoaders = (Dictionary<string, JSONModuleLoader>) sLoaders.GetValue(null);
+                    allLoaders.Clear();
+                    VanillaModuleLoaders.RegisterVanillaModules();
+                }
             }
         }
 
@@ -160,6 +182,7 @@ namespace ModManager
 
         /// <summary>
         /// Patch restarting game with TTSMM to use the requested mod session
+        /// We will also refresh the snapshot cache
         /// </summary>
         [HarmonyPatch(typeof(ManMods), "InjectModdedContentIntoGame")]
         public static class PatchForceGameRestart
@@ -179,6 +202,16 @@ namespace ModManager
                         }
                     }.Start();
                     Application.Quit();
+                }
+                else
+                {
+                    ModManager.logger.Info("Recalculating snapshot cache");
+                    IEnumerator snapshotIterator = Singleton.Manager<ManSnapshots>.inst.UpdateSnapshotCacheOnStartup();
+                    while (snapshotIterator.MoveNext())
+                    {
+                        // iterate over snapshots
+                    }
+                    ModManager.logger.Info("Recalculated snapshot cache");
                 }
             }
         }
