@@ -65,7 +65,7 @@ namespace ModManager
                 {
                     PublishedFileId_t[] workshopIds = ld.m_WorkshopIds;
                     // This mod is present here: https://steamcommunity.com/sharedfiles/filedetails/?id=2655051786
-                    if (!workshopIds.Contains(new PublishedFileId_t(2655051786))) {
+                    if (!workshopIds.Contains(new PublishedFileId_t(2790161231))) {
                         __result = false;
                     }
                 }
