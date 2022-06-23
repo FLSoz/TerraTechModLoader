@@ -19,7 +19,6 @@ namespace ModManager
 {
     public static class Patches
     {
-        internal static bool RequiresRestart = false;
         internal const BindingFlags InstanceFlags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
         internal const BindingFlags StaticFlags = BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
 
@@ -83,9 +82,17 @@ namespace ModManager
             public static bool Prefix(ref bool __result)
             {
                 if (!ModManager.LoadedWithProperParameters) {
-                    RequiresRestart = true;
                     __result = false;
-                    return false;
+                    ModSessionInfo session = (ModSessionInfo) ReflectedManMods.m_CurrentSession.GetValue(Singleton.Manager<ManMods>.inst);
+                    new Process
+                    {
+                        StartInfo =
+                        {
+                            FileName = GetExecutablePath(),
+                            Arguments = string.Format("{0} +custom_mod_list {1} +ttsmm_mod_list {2}", GetCurrentArgs(), "[:2655051786]", GetTTSMMModList(session))
+                        }
+                    }.Start();
+                    Application.Quit();
                 }
                 return true;
             }
@@ -191,28 +198,13 @@ namespace ModManager
             [HarmonyPostfix]
             public static void Postfix(ModSessionInfo newSessionInfo)
             {
-                if (RequiresRestart)
+                ModManager.logger.Info("Recalculating snapshot cache");
+                IEnumerator snapshotIterator = Singleton.Manager<ManSnapshots>.inst.UpdateSnapshotCacheOnStartup();
+                while (snapshotIterator.MoveNext())
                 {
-                    new Process
-                    {
-                        StartInfo =
-                        {
-                            FileName = GetExecutablePath(),
-                            Arguments = string.Format("{0} +custom_mod_list {1} +ttsmm_mod_list {2}", GetCurrentArgs(), "[:2655051786]", GetTTSMMModList(newSessionInfo))
-                        }
-                    }.Start();
-                    Application.Quit();
+                    // iterate over snapshots
                 }
-                else
-                {
-                    ModManager.logger.Info("Recalculating snapshot cache");
-                    IEnumerator snapshotIterator = Singleton.Manager<ManSnapshots>.inst.UpdateSnapshotCacheOnStartup();
-                    while (snapshotIterator.MoveNext())
-                    {
-                        // iterate over snapshots
-                    }
-                    ModManager.logger.Info("Recalculated snapshot cache");
-                }
+                ModManager.logger.Info("Recalculated snapshot cache");
             }
         }
 
