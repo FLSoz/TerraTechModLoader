@@ -22,17 +22,20 @@ namespace ModManager
         public readonly ModSource source;
         internal bool earlyInitRun = false;
         internal string ModID;
+        internal ModContainer container;
 
-        public WrappedMod(IManagedMod managedMod, ModSource source)
+        public WrappedMod(IManagedMod managedMod, ModContainer container, ModSource source)
         {
             this.managedMod = managedMod;
             this.source = source;
+            this.container = container;
         }
 
-        public WrappedMod(ModBase officialMod, ModSource source)
+        public WrappedMod(ModBase officialMod, ModContainer container, ModSource source)
         {
             this.officialMod = officialMod;
             this.source = source;
+            this.container = container;
         }
 
         public IManagedMod ManagedMod()

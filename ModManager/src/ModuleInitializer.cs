@@ -55,6 +55,7 @@ namespace ModManager
                     }
                     else if (commandLineArgs[i] == "+custom_mod_list")
                     {
+                        ModManager.StartedGameWithParameters = true;
                         ModManager.RequestConfiguredModSession();
                     }
                 }

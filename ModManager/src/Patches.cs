@@ -33,6 +33,26 @@ namespace ModManager
             }
         }
 
+        // Patch mod session switching
+        [HarmonyPatch(typeof(ManMods), "RequestModSession")]
+        public static class PatchLoadingState
+        {
+            [HarmonyPostfix]
+            internal static void Postfix(ref bool isMultiplayer)
+            {
+                if (isMultiplayer)
+                {
+                    Lobby lobby = Singleton.Manager<ManNetworkLobby>.inst.LobbySystem.CurrentLobby;
+                    if (lobby != null && !lobby.IsLobbyOwner() && CommandLineReader.GetArgument("+connect_lobby") == null)
+                    {
+                        // If you are joining a lobby, and you are not the lobby owner, and the game hasn't been restarted with the +connect_lobby custom parameters, then you must restart with the proper parameters
+                        ModManager.LoadedWithProperParameters = false;
+                        return;
+                    }
+                }
+            }
+        }
+
         /// <summary>
         /// Patch module registration so that we only have modules from the current session available
         /// </summary>

@@ -39,6 +39,7 @@ namespace ModManager
         private static bool patchedAssemblyLoading = false;
         private static bool patched = false;
         internal static bool LoadedWithProperParameters = false;
+        internal static bool StartedGameWithParameters = false;
         internal const string HarmonyID = "com.flsoz.ttmodding.modmanager";
         internal static PublishedFileId_t WorkshopID = new PublishedFileId_t(2790161231);
         internal static string ExecutablePath;
@@ -622,7 +623,7 @@ namespace ModManager
                             logger.Debug("Located MANAGED {Local} mod {Script} in mod {Mod} ({ModId})",
                                 localString, type.Name, contents.ModName,
                                 isWorkshop ? modContainer.ModID + " - " + workshopID.ToString() : modContainer.ModID);
-                            wrappedMod = new WrappedMod(managedMod as IManagedMod, source);
+                            wrappedMod = new WrappedMod(managedMod as IManagedMod, modContainer, source);
                         }
                         else
                         {
@@ -630,7 +631,7 @@ namespace ModManager
                                 localString, type.Name, contents.ModName,
                                 isWorkshop ? modContainer.ModID + " - " + workshopID.ToString() : modContainer.ModID);
                             ModBase createdMod = (Activator.CreateInstance(type) as ModBase);
-                            wrappedMod = new WrappedMod(createdMod, source);
+                            wrappedMod = new WrappedMod(createdMod, modContainer, source);
                         }
                         wrappedMod.ModID = modContainer.ModID;
                         managedMods.Add(type, wrappedMod);
