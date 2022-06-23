@@ -53,26 +53,6 @@ namespace ModManager
         }
 
         /// <summary>
-        /// Patch Lobby filtering to only show lobbies that also have 0ModManager
-        /// </summary>
-        [HarmonyPatch(typeof(LobbySystem.LobbyFilterOptions), "isLobbyAcceptable")]
-        public static class PatchMPLobbies
-        {
-            [HarmonyPostfix]
-            public static void Postfix(ref bool __result, LobbyData ld)
-            {
-                if (__result)
-                {
-                    PublishedFileId_t[] workshopIds = ld.m_WorkshopIds;
-                    // This mod is present here: https://steamcommunity.com/sharedfiles/filedetails/?id=2655051786
-                    if (!workshopIds.Contains(new PublishedFileId_t(2790161231))) {
-                        __result = false;
-                    }
-                }
-            }
-        }
-
-        /// <summary>
         /// Patch restarting game with TTSMM to use the requested mod session
         /// </summary>
         [HarmonyPatch(typeof(ManMods), "SessionRequiresRestart")]
@@ -474,6 +454,10 @@ namespace ModManager
                     if (ModManager.EnableTTQMMHandling)
                     {
                         __result = 0x7AC0BE11;
+                    }
+                    else
+                    {
+                        __result = 0x000F1502;
                     }
                 }
             }
