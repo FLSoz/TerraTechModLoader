@@ -289,7 +289,7 @@ namespace ModManager.Datastructures
 
             public override string ToString()
             {
-                return $"[id: {id}, value: {value.ToString()}, order: {order}, orderPriority: {orderPriority}]";
+                return $"[id: {id}, value: {value}, order: {order}, orderPriority: {orderPriority}]";
             }
 
             public int CompareTo(Node other)
@@ -310,7 +310,7 @@ namespace ModManager.Datastructures
 
             public bool Equals(Node other)
             {
-                return this.id == other.id && this.value.Equals(other.value) && this.order == other.order;
+                return this.id == other.id && this.value != null && this.value.Equals(other.value) && this.order == other.order;
             }
 
             // Define the is greater than operator.
