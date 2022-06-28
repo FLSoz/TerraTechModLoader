@@ -194,6 +194,43 @@ namespace ModManager
         [HarmonyPatch(typeof(ManMods), "InjectModdedContentIntoGame")]
         public static class PatchForceGameRestart
         {
+            internal static void PrintDictionary<T1, T2>(Dictionary<T1, T2> dictionary, StringBuilder sb)
+            {
+                sb.AppendLine("{");
+                if (dictionary != null)
+                {
+                    foreach (KeyValuePair<T1, T2> pair in dictionary)
+                    {
+                        sb.AppendLine($"\t{pair.Key}: {pair.Value}");
+                    }
+                }
+                sb.AppendLine("}");
+            }
+
+            internal static void PrintSessionInfo(ModSessionInfo sessionInfo)
+            {
+                ModManager.logger.Trace("Printing session info:");
+                StringBuilder sb = new StringBuilder();
+                sb.AppendLine("Mods:");
+                PrintDictionary(sessionInfo.Mods, sb);
+
+                sb.AppendLine("Corp IDs:");
+                PrintDictionary(sessionInfo.CorpIDs, sb);
+
+                sb.AppendLine("Skin IDs:");
+                PrintDictionary(sessionInfo.SkinIDs, sb);
+
+                sb.AppendLine("Block IDs:");
+                PrintDictionary(sessionInfo.BlockIDs, sb);
+
+                ModManager.logger.Trace(sb.ToString());
+            }
+
+            [HarmonyPrefix]
+            public static void Prefix(ModSessionInfo newSessionInfo)
+            {
+                PrintSessionInfo(newSessionInfo);
+            }
 
             [HarmonyPostfix]
             public static void Postfix(ModSessionInfo newSessionInfo)
@@ -205,6 +242,8 @@ namespace ModManager
                     // iterate over snapshots
                 }
                 ModManager.logger.Info("Recalculated snapshot cache");
+
+                PrintSessionInfo(newSessionInfo);
             }
         }
 
