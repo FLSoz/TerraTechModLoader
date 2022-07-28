@@ -54,7 +54,7 @@ namespace LogManager
                 FieldInfo loggerField = AccessTools.Field(__instance.GetType(), "logger");
                 NLog.Logger logger = (NLog.Logger) loggerField.GetValue(__instance);
                 logger.Log(NLog.LogLevel.FromOrdinal(level), message);
-                return TTLogManager.EnableVanillaLogs;
+                return false;
             }
 
             internal static bool LogExceptionPrefix(object __instance, byte level, Exception exception)
@@ -62,7 +62,7 @@ namespace LogManager
                 FieldInfo loggerField = AccessTools.Field(__instance.GetType(), "logger");
                 NLog.Logger logger = (NLog.Logger)loggerField.GetValue(__instance);
                 logger.Log(NLog.LogLevel.FromOrdinal(level), exception);
-                return TTLogManager.EnableVanillaLogs;
+                return false;
             }
 
             internal static bool LogExceptionParamsPrefix(object __instance, byte level, Exception exception, string message)
@@ -70,7 +70,7 @@ namespace LogManager
                 FieldInfo loggerField = AccessTools.Field(__instance.GetType(), "logger");
                 NLog.Logger logger = (NLog.Logger)loggerField.GetValue(__instance);
                 logger.Log(NLog.LogLevel.FromOrdinal(level), message, exception);
-                return TTLogManager.EnableVanillaLogs;
+                return false;
             }
         }
 
