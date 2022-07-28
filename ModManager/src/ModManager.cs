@@ -102,7 +102,11 @@ namespace ModManager
                 logger.Trace("Processing DeInit for mod {}", script.Name);
                 script.DeInit();
             }
-            assemblyMetadata.Clear();
+
+            // Why did I add this? There is no benefit from attempting to reload any .dlls.
+            // If they failed loading once, they will fail loading again because TT's version of mono caches .dlls,
+            // which is why this mod is needed in the first place
+            // assemblyMetadata.Clear();
         }
 
         internal static void Patch()
@@ -576,11 +580,12 @@ namespace ModManager
         private static string[] KNOWN_ASSEMBLIES = { "0Harmony", "NLog", "NLogManager", "TTModManager" };
 
         /// <summary>
-        /// Handle loading of Assembly by specified ModContainer
+        /// Handle loading of Assembly by specified ModContainer. We expect each assembly to only have one ModBase, but multiple are allowed
         /// </summary>
+        /// <remarks>We assume each assembly will only ever be processed once, so we make assumptions here</remarks>
         /// <param name="modContainer"></param>
         /// <param name="assembly"></param>
-        private static WrappedMod ProcessLoadAssembly(ModContainer modContainer, Assembly assembly)
+        private static List<WrappedMod> ProcessLoadAssembly(ModContainer modContainer, Assembly assembly)
         {
             ModContents contents = modContainer.Contents;
             PublishedFileId_t workshopID = contents.m_WorkshopId;
@@ -597,8 +602,11 @@ namespace ModManager
             catch (System.Reflection.ReflectionTypeLoadException ex)
             {
                 logger.Error("Failed to get types for {Assembly} - assuming dependency failure, saving for forced reload", assembly.FullName);
+                logger.Error(ex);
                 return null;
             }
+
+            List<WrappedMod> foundMods = new List<WrappedMod>();
 
             foreach (Type type in types)
             {
@@ -639,7 +647,7 @@ namespace ModManager
                         {
                             LegacyBlockLoader = wrappedMod;
                         }
-                        return wrappedMod;
+                        foundMods.Add(wrappedMod);
                     }
                     else
                     {
@@ -651,7 +659,13 @@ namespace ModManager
                     }
                 }
             }
-            return null;
+
+            if (foundMods.Count > 0)
+            {
+                TTLogManager.PatchLoggerSetup(assembly);
+            }
+
+            return foundMods;
         }
 
         // We no longer need to forcibly reprocess everything, since we've added hooks into the loading of mods
@@ -664,7 +678,10 @@ namespace ModManager
             EarlyInitQueue = new List<WrappedMod>();
             InitQueue = new List<WrappedMod>();
 
-            assemblyMetadata.Clear();
+            // Why did I add this? There is no benefit from attempting to reload any .dlls.
+            // If they failed loading once, they will fail loading again because TT's version of mono caches .dlls,
+            // which is why this mod is needed in the first place
+            // assemblyMetadata.Clear();
 
             ModSessionInfo session = (ModSessionInfo) ReflectedManMods.m_CurrentSession.GetValue(Singleton.Manager<ManMods>.inst);
             Dictionary<string, ModContainer> mods = (Dictionary<string, ModContainer>)ReflectedManMods.m_Mods.GetValue(Singleton.Manager<ManMods>.inst);
@@ -715,10 +732,13 @@ namespace ModManager
                             else
                             {
                                 assemblyMetadata.Add(assembly, modContainer);
-                                WrappedMod createdMod = ProcessLoadAssembly(modContainer, assembly);
-                                if (createdMod != null)
+                                List<WrappedMod> foundMods = ProcessLoadAssembly(modContainer, assembly);
+                                if (foundMods != null)
                                 {
-                                    modMetadata.Add(createdMod, modContainer);
+                                    foreach (WrappedMod wrappedMod in foundMods)
+                                    {
+                                        modMetadata.Add(wrappedMod, modContainer);
+                                    }
                                 }
                             }
                         }

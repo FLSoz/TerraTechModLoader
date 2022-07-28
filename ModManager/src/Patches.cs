@@ -37,7 +37,7 @@ namespace ModManager
         public static class PatchLoadingState
         {
             [HarmonyPostfix]
-            internal static void Postfix(ref bool isMultiplayer)
+            internal static void Postfix(bool isMultiplayer)
             {
                 if (isMultiplayer)
                 {
@@ -60,7 +60,7 @@ namespace ModManager
         {
             internal static readonly FieldInfo sLoaders = typeof(JSONBlockLoader).GetField("sLoaders", StaticFlags);
             [HarmonyPostfix]
-            internal static void Postfix(ref ModSessionInfo oldSessionInfo)
+            internal static void Postfix(ModSessionInfo oldSessionInfo)
             {
                 if (oldSessionInfo != null)
                 {
@@ -89,7 +89,7 @@ namespace ModManager
                         StartInfo =
                         {
                             FileName = GetExecutablePath(),
-                            Arguments = string.Format("{0} +custom_mod_list {1} +ttsmm_mod_list {2}", GetCurrentArgs(), "[:2655051786]", GetTTSMMModList(session))
+                            Arguments = string.Format("{0} +custom_mod_list {1} +ttsmm_mod_list {2}", GetCurrentArgs(), $"[:{ModManager.WorkshopID}]", GetTTSMMModList(session))
                         }
                     }.Start();
                     Application.Quit();
@@ -192,7 +192,7 @@ namespace ModManager
         /// We will also refresh the snapshot cache
         /// </summary>
         [HarmonyPatch(typeof(ManMods), "InjectModdedContentIntoGame")]
-        public static class PatchForceGameRestart
+        public static class PatchContentInjection
         {
             internal static void PrintDictionary<T1, T2>(Dictionary<T1, T2> dictionary, StringBuilder sb)
             {
@@ -247,6 +247,68 @@ namespace ModManager
             }
         }
 
+        [HarmonyPatch(typeof(ModSessionInfo), "Write")]
+        public static class PatchModSessionWriting
+        {
+            [HarmonyPrefix]
+            public static void PatchLogSession(ModSessionInfo __instance) {
+                PatchContentInjection.PrintSessionInfo(__instance);
+            }
+        }
+
+        /*
+        [HarmonyPatch(typeof(ManMods), "PreLobbyCreated")]
+        public static class PatchLobbyCreation
+        {
+            internal static FieldInfo m_CurrentLobbySession = typeof(ManMods).GetField("m_CurrentLobbySession", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            internal static FieldInfo m_CurrentSession = typeof(ManMods).GetField("m_CurrentSession", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+
+            internal static void DeepCopy<T1, T2>(Dictionary<T1, T2> source, Dictionary<T1, T2> target)
+            {
+                if (source != null && target != null)
+                {
+                    foreach (KeyValuePair<T1, T2> pair in source)
+                    {
+                        target.Add(pair.Key, pair.Value);
+                    }
+                }
+            }
+
+            [HarmonyPostfix]
+            public static void Postfix()
+            {
+                ModSessionInfo session = (ModSessionInfo) m_CurrentLobbySession.GetValue(Singleton.Manager<ManMods>.inst);
+                ModSessionInfo currentSession = (ModSessionInfo) m_CurrentSession.GetValue(Singleton.Manager<ManMods>.inst);
+                if (session != null && currentSession != null)
+                {
+                    ModManager.logger.Info("Patched MP lobby loading");
+
+                    Dictionary<int, string> currentCorpIDs = currentSession.CorpIDs;
+                    Dictionary<int, string> targetcorpIDs = session.CorpIDs;
+                    DeepCopy(currentCorpIDs, targetcorpIDs);
+
+                    Dictionary<int, string> currentSkinIDs = currentSession.SkinIDs;
+                    if (currentSkinIDs != null && currentSkinIDs.Count > 0)
+                    {
+                        Dictionary<int, string> targetSkinIDs = session.SkinIDs;
+                        if (targetSkinIDs == null)
+                        {
+                            targetSkinIDs = new Dictionary<int, string>();
+                            session.SkinIDs = targetSkinIDs;
+                        }
+                        DeepCopy(currentSkinIDs, targetSkinIDs);
+                    }
+
+                    Dictionary<int, string> currentBlockIDs = currentSession.BlockIDs;
+                    Dictionary<int, string> targetBlockIDs = session.BlockIDs;
+                    DeepCopy(currentBlockIDs, targetBlockIDs);
+
+                    ModManager.logger.Trace("Patched Lobby Session:");
+                    PatchContentInjection.PrintSessionInfo(session);
+                }
+            }
+        } */
+
         /// <summary>
         /// Patch restarting game with TTSMM to use the requested mod session
         /// </summary>
@@ -261,7 +323,7 @@ namespace ModManager
                     StartInfo =
                     {
                         FileName = GetExecutablePath(),
-                        Arguments = string.Format("{0} +connect_lobby {1} +custom_mod_list {2} +ttsmm_mod_list {3}", GetCurrentArgs(), lobbyID.m_NetworkID, "[:2655051786]", GetTTSMMModList(modList))
+                        Arguments = string.Format("{0} +connect_lobby {1} +custom_mod_list {2} +ttsmm_mod_list {3}", GetCurrentArgs(), lobbyID.m_NetworkID, $"[:{ModManager.WorkshopID}]", GetTTSMMModList(modList))
                     }
                 }.Start();
                 Application.Quit();
@@ -453,7 +515,7 @@ namespace ModManager
         public static class PatchLoadingBar
         {
             [HarmonyPrefix]
-            public static bool Prefix(ref UILoadingScreenModProgress __instance)
+            public static bool Prefix(UILoadingScreenModProgress __instance)
             {
                 if (ModManager.CurrentOperation != null)
                 {

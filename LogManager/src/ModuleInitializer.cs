@@ -6,7 +6,7 @@ namespace LogManager
 {
     public static class ModuleInitializer
     {
-        public const string VERSION = "1.0.0.1";    // <major version>.<minor version>.<build number>.<revision>
+        public const string VERSION = "1.1.0.0";    // <major version>.<minor version>.<build number>.<revision>
         private static bool Inited = false;
         public static void Run()
         {

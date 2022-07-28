@@ -8,13 +8,78 @@ namespace LogManager
 {
     internal static class Patches
     {
-        internal const string HarmonyID = "com.flsoz.ttmodding.logmanager";
-        internal static Harmony harmony = new Harmony(HarmonyID);
+        internal static class SupportedLoggerPatch
+        {
+            internal static void SetupPrefix(object __instance)
+            {
+                Type type = __instance.GetType();
+                Console.WriteLine($"[LogManager] Setting up managed logger for type {type.FullName}");
+                FieldInfo loggerIDField = AccessTools.Field(type, "loggerID");
+                FieldInfo loggerField = AccessTools.Field(type, "logger");
+                FieldInfo loggingLevelField = AccessTools.Field(type, "minLoggingLevel");
+                FieldInfo pathField = AccessTools.Field(type, "path");
+                FieldInfo layoutField = AccessTools.Field(type, "layout");
+                FieldInfo keepOldFilesField = AccessTools.Field(type, "keepOldFiles");
+                FieldInfo filenameField = AccessTools.Field(type, "filename");
+                Console.WriteLine($"[LogManager]  Reflection setup");
+
+                string loggerID = (string)loggerIDField.GetValue(__instance);
+                byte minLoggingLevel = (byte)loggingLevelField.GetValue(__instance);
+                string path = (string)pathField.GetValue(__instance);
+                string layout = (string)layoutField.GetValue(__instance);
+                string filename = (string)filenameField.GetValue(__instance);
+                bool keepOldFiles = (bool)keepOldFilesField.GetValue(__instance);
+                Console.WriteLine($"[LogManager]  Reflection succeeded");
+
+                NLog.Logger logger = NLog.LogManager.GetLogger(loggerID);
+                Console.WriteLine($"[LogManager]  Setup NLog logger");
+                loggerField.SetValue(__instance, logger);
+                Console.WriteLine($"[LogManager]  Bound NLog logger");
+
+                TargetConfig targetConfig = new TargetConfig()
+                {
+                    filename = filename,
+                    path = path,
+                    layout = layout,
+                    keepOldFiles = keepOldFiles
+                };
+
+                LogTarget target = TTLogManager.RegisterLoggingTarget(loggerID, targetConfig);
+                TTLogManager.RegisterLogger(logger, target, NLog.LogLevel.FromOrdinal(minLoggingLevel));
+                Console.WriteLine($"[LogManager]  Registered managed logger");
+            }
+
+            internal static bool LogPrefix(object __instance, byte level, string message)
+            {
+                FieldInfo loggerField = AccessTools.Field(__instance.GetType(), "logger");
+                NLog.Logger logger = (NLog.Logger) loggerField.GetValue(__instance);
+                logger.Log(NLog.LogLevel.FromOrdinal(level), message);
+                return TTLogManager.EnableVanillaLogs;
+            }
+
+            internal static bool LogExceptionPrefix(object __instance, byte level, Exception exception)
+            {
+                FieldInfo loggerField = AccessTools.Field(__instance.GetType(), "logger");
+                NLog.Logger logger = (NLog.Logger)loggerField.GetValue(__instance);
+                logger.Log(NLog.LogLevel.FromOrdinal(level), exception);
+                return TTLogManager.EnableVanillaLogs;
+            }
+
+            internal static bool LogExceptionParamsPrefix(object __instance, byte level, Exception exception, string message)
+            {
+                FieldInfo loggerField = AccessTools.Field(__instance.GetType(), "logger");
+                NLog.Logger logger = (NLog.Logger)loggerField.GetValue(__instance);
+                logger.Log(NLog.LogLevel.FromOrdinal(level), message, exception);
+                return TTLogManager.EnableVanillaLogs;
+            }
+        }
+
+        // Patch for vanilla logging
         internal static Logger logger;
 
         internal static void Init()
         {
-            harmony.PatchAll();
+            TTLogManager.harmony.PatchAll();
 
             LogManager.TargetConfig targetConfig = new LogManager.TargetConfig {
                 layout = "${longdate} | ${level:uppercase=true:padding=-5:alignmentOnTruncation=left} | ${message}  ${exception}"
@@ -23,7 +88,7 @@ namespace LogManager
             // create a logger that writes to /Logs/output.log
             LogTarget target = TTLogManager.RegisterLoggingTarget("output", targetConfig);
             logger = NLog.LogManager.GetLogger("vanilla");
-            LogLevel minLevel = TTLogManager.ConfiguredGlobalLogLevel != null ? TTLogManager.ConfiguredGlobalLogLevel : LogLevel.Info;
+            LogLevel minLevel = TTLogManager.ConfiguredGlobalLogLevel != null ? TTLogManager.ConfiguredGlobalLogLevel : LogLevel.Error;
             TTLogManager.RegisterLogger(logger, target, minLevel);
         }
 
@@ -36,6 +101,7 @@ namespace LogManager
                 {
                     return $"{message.Substring(1, index - 1)} |{message.Substring(index + 1)}";
                 }
+                return message;
             }
             return message;
         }
