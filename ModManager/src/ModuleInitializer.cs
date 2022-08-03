@@ -13,7 +13,7 @@ namespace ModManager
         {
             if (!Inited)
             {
-                Console.WriteLine($"[0ModManager] Initializing mod manager v.{Assembly.GetExecutingAssembly().GetName().Version} ...");
+                Console.WriteLine($"[0ModManager] Initializing mod manager version v.{Assembly.GetExecutingAssembly().GetName().Version} ...");
 
                 // Configure all loggers
                 ModManager.ConfigureLogger();
