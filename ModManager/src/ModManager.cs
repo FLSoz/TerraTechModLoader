@@ -73,8 +73,10 @@ namespace ModManager
 
         private static List<string> LoadedMods;
         
-        private static List<WrappedMod> EarlyInitQueue;
-        private static List<WrappedMod> InitQueue;
+        private static List<WrappedMod> EarlyInitQueue = new List<WrappedMod>();
+        private static List<WrappedMod> InitQueue = new List<WrappedMod>();
+        private static List<WrappedMod> UpdateQueue = new List<WrappedMod>();
+        private static List<WrappedMod> FixedUpdateQueue = new List<WrappedMod>();
 
         internal static Dictionary<ulong, SteamDownloadItemData> workshopMetadata = new Dictionary<ulong, SteamDownloadItemData>();
         internal static Dictionary<Assembly, ModContainer> assemblyMetadata = new Dictionary<Assembly, ModContainer>();
@@ -347,7 +349,7 @@ namespace ModManager
             }
         }
 
-        private static List<WrappedMod> ProcessOrder(Func<IManagedMod, Type[]> getBefore, Func<IManagedMod, Type[]> getAfter)
+        private static List<WrappedMod> ProcessOrder(Func<IManagedMod, Type[]> getBefore, Func<IManagedMod, Type[]> getAfter, Func<WrappedMod, int> getOrder, Func<WrappedMod, bool> actuallyProcess = null)
         {
             Dictionary<string, ModContainer> mods = (Dictionary<string, ModContainer>)ReflectedManMods.m_Mods.GetValue(Singleton.Manager<ManMods>.inst);
             DependencyGraph<Type> dependencies = new DependencyGraph<Type>();
@@ -356,12 +358,12 @@ namespace ModManager
             {
                 // Only process currently active mods (in the session)
                 string modID = entry.Value.ModID;
-                if (mods.ContainsKey(modID))
+                if (mods.ContainsKey(modID) && (actuallyProcess == null || actuallyProcess(entry.Value)))
                 {
                     dependencies.AddNode(new DependencyGraph<Type>.Node
                     {
                         value = entry.Key,
-                        order = entry.Value.LoadOrder
+                        order = getOrder(entry.Value)
                     });
                 }
             }
@@ -370,7 +372,7 @@ namespace ModManager
             {
                 // Only process currently active mods (in the session)
                 WrappedMod mod = entry.Value;
-                if (mods.ContainsKey(mod.ModID))
+                if (mods.ContainsKey(mod.ModID) && (actuallyProcess == null || actuallyProcess(entry.Value)))
                 {
                     IManagedMod managedMod;
                     if (!((managedMod = mod.ManagedMod()) is null))
@@ -678,8 +680,10 @@ namespace ModManager
         /// <remarks>Assumes that all script mods have been loaded correctly (no bad .dll errors)</remarks>
         public static void ReprocessOfficialMods()
         {
-            EarlyInitQueue = new List<WrappedMod>();
-            InitQueue = new List<WrappedMod>();
+            EarlyInitQueue.Clear();
+            InitQueue.Clear();
+            UpdateQueue.Clear();
+            FixedUpdateQueue.Clear();
 
             // Why did I add this? There is no benefit from attempting to reload any .dlls.
             // If they failed loading once, they will fail loading again because TT's version of mono caches .dlls,
@@ -753,24 +757,61 @@ namespace ModManager
             CurrentOperation = null;
         }
 
-        public static void ReprocessInitializationOrder()
+        public static void ReprocessModOrders()
         {
+            EarlyInitQueue.Clear();
+            InitQueue.Clear();
+            UpdateQueue.Clear();
+            FixedUpdateQueue.Clear();
+
             // Process the correct load order of EarlyInits
             logger.Info("Building EarlyInit dependency graph");
-            EarlyInitQueue = ProcessOrder((IManagedMod mod) => { return mod.earlyLoadBefore; }, (IManagedMod mod) => { return mod.earlyLoadAfter; });
-            logger.Info("EarlyInit Mod Queue: ");
+            EarlyInitQueue = ProcessOrder(
+                (IManagedMod mod) => { return mod.EarlyLoadBefore; },
+                (IManagedMod mod) => { return mod.EarlyLoadAfter; },
+                (WrappedMod mod) => { return mod.EarlyInitOrder; });
+            logger.Debug("EarlyInit Mod Queue: ");
             foreach (WrappedMod mod in EarlyInitQueue)
             {
-                logger.Info(" - {mod}", mod.Name);
+                logger.Debug(" - {mod}", mod.Name);
             }
 
             // Process the correct load order of Inits
             logger.Info("Building Init dependency graph");
-            InitQueue = ProcessOrder((IManagedMod mod) => { return mod.loadBefore; }, (IManagedMod mod) => { return mod.loadAfter; });
-            logger.Info("Init Mod Queue: ");
+            InitQueue = ProcessOrder(
+                (IManagedMod mod) => { return mod.LoadBefore; },
+                (IManagedMod mod) => { return mod.LoadAfter; },
+                (WrappedMod mod) => { return mod.InitOrder; });
+            logger.Debug("Init Mod Queue: ");
             foreach (WrappedMod mod in InitQueue)
             {
-                logger.Info(" - {mod}", mod.Name);
+                logger.Debug(" - {mod}", mod.Name);
+            }
+
+            // Process Update order
+            logger.Info("Building Update dependency graph");
+            UpdateQueue = ProcessOrder(
+                (IManagedMod mod) => { return mod.UpdateBefore; },
+                (IManagedMod mod) => { return mod.UpdateAfter; },
+                (WrappedMod mod) => { return mod.UpdateOrder; },
+                (WrappedMod mod) => { return mod.HasUpdate; });
+            logger.Debug("Update Mod Queue: ");
+            foreach (WrappedMod mod in UpdateQueue)
+            {
+                logger.Debug(" - {mod}", mod.Name);
+            }
+
+            // Process FixedUpdate order
+            logger.Info("Building FixedUpdate dependency graph");
+            FixedUpdateQueue = ProcessOrder(
+                (IManagedMod mod) => { return mod.FixedUpdateBefore; },
+                (IManagedMod mod) => { return mod.FixedUpdateAfter; },
+                (WrappedMod mod) => { return mod.FixedUpdateOrder; },
+                (WrappedMod mod) => { return mod.HasFixedUpdate; });
+            logger.Debug("FixedUpdate Mod Queue: ");
+            foreach (WrappedMod mod in FixedUpdateQueue)
+            {
+                logger.Debug(" - {mod}", mod.Name);
             }
         }
 
@@ -928,6 +969,38 @@ namespace ModManager
             }
             CurrentOperation = null;
             CurrentOperationSpecifics = null;
+        }
+
+        public static void ProcessUpdate()
+        {
+            foreach (WrappedMod script in UpdateQueue)
+            {
+                try
+                {
+                    logger.Trace($"Firing Update for {script.Name}");
+                    script.Update();
+                }
+                catch (Exception e)
+                {
+                    logger.Error($"Failed to process Update() for {script.Name}:\n{e.ToString()}");
+                }
+            }
+        }
+
+        public static void ProcessFixedUpdate()
+        {
+            foreach (WrappedMod script in FixedUpdateQueue)
+            {
+                try
+                {
+                    logger.Trace($"Firing FixedUpdate for {script.Name}");
+                    script.FixedUpdate();
+                }
+                catch (Exception e)
+                {
+                    logger.Error($"Failed to process FixedUpdate() for {script.Name}:\n{e.ToString()}");
+                }
+            }
         }
     }
 }

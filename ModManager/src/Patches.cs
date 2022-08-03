@@ -358,13 +358,35 @@ namespace ModManager
                 ModManager.ReprocessOfficialMods();
 
                 ModManager.logger.Info("All mods reprocessed. Determining dependencies");
-                ModManager.ReprocessInitializationOrder();
+                ModManager.ReprocessModOrders();
 
                 ModManager.PatchCustomBlocksIfNeeded();
 
                 ModManager.ProcessEarlyInits();
                 ModManager.ProcessInits();
                 ModManager.logger.Info("InitModScripts End");
+                return false;
+            }
+        }
+
+        [HarmonyPatch(typeof(ManMods), "UpdateModScripts")]
+        public static class PatchScriptUpdate
+        {
+            [HarmonyPrefix]
+            public static bool Prefix()
+            {
+                ModManager.ProcessUpdate();
+                return false;
+            }
+        }
+
+        [HarmonyPatch(typeof(ManMods), "FixedUpdateModScripts")]
+        public static class PatchScriptFixedUpdate
+        {
+            [HarmonyPrefix]
+            public static bool Prefix()
+            {
+                ModManager.ProcessFixedUpdate();
                 return false;
             }
         }

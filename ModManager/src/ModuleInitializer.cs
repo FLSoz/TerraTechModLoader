@@ -1,22 +1,19 @@
 ﻿using System;
-using Newtonsoft.Json;
-using HarmonyLib;
+using System.Reflection;
 using ModManager.Datastructures;
-using NLog;
 using ModManager.patches;
 
 namespace ModManager
 {
     public static class ModuleInitializer
     {
-        public const string VERSION = "1.0.0.2";    // <major version>.<minor version>.<build number>.<revision>
         private static bool Inited = false;
 
         public static void Run()
         {
             if (!Inited)
             {
-                Console.WriteLine($"[0ModManager] Initializing mod manager v.{VERSION}...");
+                Console.WriteLine($"[0ModManager] Initializing mod manager v.{Assembly.GetExecutingAssembly().GetName().Version} ...");
 
                 // Configure all loggers
                 ModManager.ConfigureLogger();

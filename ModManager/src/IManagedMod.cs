@@ -9,12 +9,27 @@ namespace ModManager
 {
     public interface IManagedMod
     {
-        ModBase instance
+        ModBase Instance
         {
             get;
         }
 
-        int loadOrder
+        int InitOrder
+        {
+            get;
+        }
+
+        int EarlyInitOrder
+        {
+            get;
+        }
+
+        int UpdateOrder
+        {
+            get;
+        }
+
+        int FixedUpdateOrder
         {
             get;
         }
@@ -30,22 +45,42 @@ namespace ModManager
         }
 
         // what order to run EarlyInit() things in
-        Type[] earlyLoadAfter
+        Type[] EarlyLoadAfter
         {
             get;
         }
-        Type[] earlyLoadBefore
+        Type[] EarlyLoadBefore
         {
             get;
         }
 
         // What order to run Init things in.
         // Also serves as reverse order to run DeInit in
-        Type[] loadAfter
+        Type[] LoadAfter
         {
             get;
         }
-        Type[] loadBefore
+        Type[] LoadBefore
+        {
+            get;
+        }
+
+        // What order to run Update things in
+        Type[] UpdateAfter
+        {
+            get;
+        }
+        Type[] UpdateBefore
+        {
+            get;
+        }
+
+        // What order to run FixedUpdate things in
+        Type[] FixedUpdateAfter
+        {
+            get;
+        }
+        Type[] FixedUpdateBefore
         {
             get;
         }
@@ -55,5 +90,19 @@ namespace ModManager
         void Init();
 
         void EarlyInit();
+
+        void Update();
+
+        void FixedUpdate();
+
+        bool HasUpdate
+        {
+            get;
+        }
+
+        bool HasFixedUpdate
+        {
+            get;
+        }
     }
 }

@@ -58,18 +58,87 @@ namespace ModManager
             }
         }
 
-        public int LoadOrder
+        public int InitOrder
         {
             get
             {
                 if (this.managedMod != null)
                 {
-                    return this.managedMod.loadOrder;
+                    return this.managedMod.InitOrder;
                 }
                 else
                 {
                     return ModManager.DEFAULT_LOAD_ORDER;
                 }
+            }
+        }
+
+        public int EarlyInitOrder
+        {
+            get
+            {
+                if (this.managedMod != null)
+                {
+                    return this.managedMod.EarlyInitOrder;
+                }
+                else
+                {
+                    return ModManager.DEFAULT_LOAD_ORDER;
+                }
+            }
+        }
+
+        public int UpdateOrder
+        {
+            get
+            {
+                if (this.managedMod != null)
+                {
+                    return this.managedMod.UpdateOrder;
+                }
+                else
+                {
+                    return ModManager.DEFAULT_LOAD_ORDER;
+                }
+            }
+        }
+
+        public int FixedUpdateOrder
+        {
+            get
+            {
+                if (this.managedMod != null)
+                {
+                    return this.managedMod.FixedUpdateOrder;
+                }
+                else
+                {
+                    return ModManager.DEFAULT_LOAD_ORDER;
+                }
+            }
+        }
+
+        public bool HasUpdate
+        {
+            get
+            {
+                if (this.managedMod != null)
+                {
+                    return this.managedMod.HasUpdate;
+                }
+                return false;
+            }
+        }
+
+        public bool HasFixedUpdate
+        {
+            get
+            {
+                if (this.managedMod != null)
+                {
+                    return this.managedMod.HasFixedUpdate;
+                }
+                return false;
             }
         }
 
@@ -116,6 +185,30 @@ namespace ModManager
             else
             {
                 this.officialMod.DeInit();
+            }
+        }
+
+        public void Update()
+        {
+            if (this.managedMod != null)
+            {
+                this.managedMod.Update();
+            }
+            else
+            {
+                this.officialMod.Update();
+            }
+        }
+
+        public void FixedUpdate()
+        {
+            if (this.managedMod != null)
+            {
+                this.managedMod.FixedUpdate();
+            }
+            else
+            {
+                this.officialMod.FixedUpdate();
             }
         }
     }
