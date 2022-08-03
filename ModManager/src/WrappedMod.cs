@@ -142,6 +142,11 @@ namespace ModManager
             }
         }
 
+        public bool IsRemote
+        {
+            get => this.container.IsRemote;
+        }
+
         public void EarlyInit()
         {
             if (this.managedMod != null)

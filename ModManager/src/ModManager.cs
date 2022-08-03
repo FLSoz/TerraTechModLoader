@@ -12,6 +12,7 @@ using LogManager;
 using Payload.UI.Commands.Steam;
 using Newtonsoft.Json.Linq;
 using System.Runtime.CompilerServices;
+using UnityEngine;
 
 namespace ModManager
 {
@@ -57,6 +58,9 @@ namespace ModManager
         private static readonly string ModListFileName = Path.Combine(TTSteamDir, "modlist.txt");
         internal const int DEFAULT_LOAD_ORDER = 10;
 
+        internal const BindingFlags InstanceFlags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
+        internal const BindingFlags StaticFlags = BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
+
         internal static NLog.Logger logger = NLog.LogManager.GetLogger("ModManager");
         public static void ConfigureLogger()
         {
@@ -64,7 +68,7 @@ namespace ModManager
             {
                 layout = "${longdate} | ${level:uppercase=true:padding=-5:alignmentOnTruncation=left} | ${logger:shortName=true} | ${message}  ${exception}",
                 keepOldFiles = false,
-                defaultMinLevel = LogLevel.Debug
+                defaultMinLevel = LogLevel.Warn
             };
             TTLogManager.RegisterLogger(logger, config);
         }
@@ -227,8 +231,8 @@ namespace ModManager
             // We explicitly loaded only this mod. 
             logger.Info("No custom mod list found - getting default mod loading behaviour");
             ManMods manMods = Singleton.Manager<ManMods>.inst;
-            typeof(ManMods).GetMethod("CheckForLocalMods", Patches.InstanceFlags).Invoke(manMods, null);
-            typeof(ManMods).GetMethod("CheckForSteamWorkshopMods", Patches.InstanceFlags).Invoke(manMods, null);
+            typeof(ManMods).GetMethod("CheckForLocalMods", InstanceFlags).Invoke(manMods, null);
+            typeof(ManMods).GetMethod("CheckForSteamWorkshopMods", InstanceFlags).Invoke(manMods, null);
         }
 
         internal static bool TryFindAssembly(ModContainer mod, string name, out Assembly assembly)
@@ -358,13 +362,24 @@ namespace ModManager
             {
                 // Only process currently active mods (in the session)
                 string modID = entry.Value.ModID;
-                if (mods.ContainsKey(modID) && (actuallyProcess == null || actuallyProcess(entry.Value)))
+                if (mods.ContainsKey(modID))
                 {
-                    dependencies.AddNode(new DependencyGraph<Type>.Node
+                    if (actuallyProcess == null || actuallyProcess(entry.Value))
                     {
-                        value = entry.Key,
-                        order = getOrder(entry.Value)
-                    });
+                        dependencies.AddNode(new DependencyGraph<Type>.Node
+                        {
+                            value = entry.Key,
+                            order = getOrder(entry.Value)
+                        });
+                    }
+                    else
+                    {
+                        logger.Debug($"Mod {modID} BLOCKED from being processed");
+                    }
+                }
+                else
+                {
+                    logger.Warn($"Mod {modID} is present, but not in session");
                 }
             }
             // add edges
@@ -630,29 +645,36 @@ namespace ModManager
                     };
                     if (!managedMods.TryGetValue(type, out WrappedMod wrappedMod))
                     {
-                        ManagedMod managedMod = ManagedMod.FromMod(type);
-                        if (!(managedMod is null))
+                        try
                         {
-                            logger.Debug("Located MANAGED {Local} mod {Script} in mod {Mod} ({ModId})",
-                                localString, type.Name, contents.ModName,
-                                isWorkshop ? modContainer.ModID + " - " + workshopID.ToString() : modContainer.ModID);
-                            wrappedMod = new WrappedMod(managedMod as IManagedMod, modContainer, source);
+                            ManagedMod managedMod = ManagedMod.FromMod(type);
+                            if (!(managedMod is null))
+                            {
+                                logger.Debug("Located MANAGED {Local} mod {Script} in mod {Mod} ({ModId})",
+                                    localString, type.Name, contents.ModName,
+                                    isWorkshop ? modContainer.ModID + " - " + workshopID.ToString() : modContainer.ModID);
+                                wrappedMod = new WrappedMod(managedMod as IManagedMod, modContainer, source);
+                            }
+                            else
+                            {
+                                logger.Debug("Located NON-MANAGED {Local} mod {Script} in mod {Mod} ({ModId})",
+                                    localString, type.Name, contents.ModName,
+                                    isWorkshop ? modContainer.ModID + " - " + workshopID.ToString() : modContainer.ModID);
+                                ModBase createdMod = (Activator.CreateInstance(type) as ModBase);
+                                wrappedMod = new WrappedMod(createdMod, modContainer, source);
+                            }
+                            wrappedMod.ModID = modContainer.ModID;
+                            managedMods.Add(type, wrappedMod);
+                            if (assembly.FullName.Contains("LegacyBlockLoader"))
+                            {
+                                LegacyBlockLoader = wrappedMod;
+                            }
+                            foundMods.Add(wrappedMod);
                         }
-                        else
+                        catch (Exception e)
                         {
-                            logger.Debug("Located NON-MANAGED {Local} mod {Script} in mod {Mod} ({ModId})",
-                                localString, type.Name, contents.ModName,
-                                isWorkshop ? modContainer.ModID + " - " + workshopID.ToString() : modContainer.ModID);
-                            ModBase createdMod = (Activator.CreateInstance(type) as ModBase);
-                            wrappedMod = new WrappedMod(createdMod, modContainer, source);
+                            logger.Error($"Failed to create a Managed Mod for {type}:\n{e}");
                         }
-                        wrappedMod.ModID = modContainer.ModID;
-                        managedMods.Add(type, wrappedMod);
-                        if (assembly.FullName.Contains("LegacyBlockLoader"))
-                        {
-                            LegacyBlockLoader = wrappedMod;
-                        }
-                        foundMods.Add(wrappedMod);
                     }
                     else
                     {
@@ -678,7 +700,7 @@ namespace ModManager
         /// Handle processing of all Official mods. Will detect everything in the mod list, determine dependency relationships based on reflection, and setup the load queue.
         /// </summary>
         /// <remarks>Assumes that all script mods have been loaded correctly (no bad .dll errors)</remarks>
-        public static void ReprocessOfficialMods()
+        public static IEnumerator<float> ReprocessOfficialMods(ModSessionInfo session)
         {
             EarlyInitQueue.Clear();
             InitQueue.Clear();
@@ -689,12 +711,10 @@ namespace ModManager
             // If they failed loading once, they will fail loading again because TT's version of mono caches .dlls,
             // which is why this mod is needed in the first place
             // assemblyMetadata.Clear();
-
-            ModSessionInfo session = (ModSessionInfo) ReflectedManMods.m_CurrentSession.GetValue(Singleton.Manager<ManMods>.inst);
             Dictionary<string, ModContainer> mods = (Dictionary<string, ModContainer>)ReflectedManMods.m_Mods.GetValue(Singleton.Manager<ManMods>.inst);
 
             // Clear out any and all script mods that are present
-            logger.Info("Reprocessing all mods in session");
+            logger.Info($"Reprocessing all mods in session: {session.Mods.Count}");
             int numMods = session.Mods.Count;
             int processed = 0;
             CurrentOperation = "Processing potential code mods";
@@ -702,6 +722,7 @@ namespace ModManager
             {
                 CurrentOperationSpecifics = $"Post-processing {key}";
                 CurrentOperationProgress = (float) processed / (float) numMods;
+                logger.Debug($"Trying to locate mods in mod ID {key}");
 
                 ModContainer modContainer;
                 if (mods.TryGetValue(key, out modContainer) && modContainer != null)
@@ -751,13 +772,28 @@ namespace ModManager
                         }
                     }
                 }
+                else
+                {
+                    logger.Error($"FAILED to fetch ModContainer for {key}");
+                    if (!mods.ContainsKey(key))
+                    {
+                        logger.Error($"  m_Mods missing key");
+                    }
+                    else if (modContainer == null)
+                    {
+                        logger.Error("  ModContainer is NULL");
+                    }
+                }
                 processed++;
+                yield return CurrentOperationProgress;
             }
             CurrentOperationSpecifics = null;
             CurrentOperation = null;
+            yield return 1.0f;
+            yield break;
         }
 
-        public static void ReprocessModOrders()
+        public static void ReprocessModOrders(ModSessionInfo session)
         {
             EarlyInitQueue.Clear();
             InitQueue.Clear();
@@ -769,7 +805,8 @@ namespace ModManager
             EarlyInitQueue = ProcessOrder(
                 (IManagedMod mod) => { return mod.EarlyLoadBefore; },
                 (IManagedMod mod) => { return mod.EarlyLoadAfter; },
-                (WrappedMod mod) => { return mod.EarlyInitOrder; });
+                (WrappedMod mod) => { return mod.EarlyInitOrder; },
+                (WrappedMod mod) => { return session.m_Multiplayer || !mod.IsRemote; });
             logger.Debug("EarlyInit Mod Queue: ");
             foreach (WrappedMod mod in EarlyInitQueue)
             {
@@ -781,7 +818,8 @@ namespace ModManager
             InitQueue = ProcessOrder(
                 (IManagedMod mod) => { return mod.LoadBefore; },
                 (IManagedMod mod) => { return mod.LoadAfter; },
-                (WrappedMod mod) => { return mod.InitOrder; });
+                (WrappedMod mod) => { return mod.InitOrder; },
+                (WrappedMod mod) => { return session.m_Multiplayer || !mod.IsRemote; });
             logger.Debug("Init Mod Queue: ");
             foreach (WrappedMod mod in InitQueue)
             {
@@ -826,7 +864,7 @@ namespace ModManager
             MethodInfo AddTechComponentToPrefab = BlockLoader
                 .GetMethod(
                     "AddTechComponentToPrefab",
-                    Patches.StaticFlags,
+                    StaticFlags,
                     null,
                     new Type[] { typeof(Type) },
                     null
@@ -836,12 +874,12 @@ namespace ModManager
             logger.Debug("Patched TechPhysicsReset component");
             #endregion
 
-            Type BlockInjectorPatches = BlockLoader.GetNestedTypes(BindingFlags.Static | Patches.InstanceFlags).Where(type => type.Name == "Patches").First();
+            Type BlockInjectorPatches = BlockLoader.GetNestedTypes(BindingFlags.Static | InstanceFlags).Where(type => type.Name == "Patches").First();
             #region 1.4.0.1+ Patches
-            Type OfficialBlocks = BlockInjectorPatches.GetNestedTypes(Patches.StaticFlags).Where(type => type.Name == "OfficialBlocks").First();
+            Type OfficialBlocks = BlockInjectorPatches.GetNestedTypes(StaticFlags).Where(type => type.Name == "OfficialBlocks").First();
             MethodInfo Patch = OfficialBlocks.GetMethod(
                 "Patch",
-                    Patches.StaticFlags,
+                    StaticFlags,
                     null,
                     new Type[] { typeof(Harmony) },
                     null
@@ -853,22 +891,22 @@ namespace ModManager
             #region Miscellaneous Patches
             try
             {
-                Type Projectile_UnlockColliderQuantity = BlockInjectorPatches.GetNestedTypes(Patches.StaticFlags).Where(type => type.Name == "Projectile_UnlockColliderQuantity").First();
-                blockInjectorHarmony.Patch(typeof(Projectile).GetMethod("PrePool", Patches.InstanceFlags), null, null, transpiler: new HarmonyMethod(Projectile_UnlockColliderQuantity.GetMethod("Transpiler", Patches.StaticFlags)));
+                Type Projectile_UnlockColliderQuantity = BlockInjectorPatches.GetNestedTypes(StaticFlags).Where(type => type.Name == "Projectile_UnlockColliderQuantity").First();
+                blockInjectorHarmony.Patch(typeof(Projectile).GetMethod("PrePool", InstanceFlags), null, null, transpiler: new HarmonyMethod(Projectile_UnlockColliderQuantity.GetMethod("Transpiler", StaticFlags)));
             }
             catch (Exception E)
             {
                 logger.Error(E, "Error while patching custom blocks");
             }
 
-            typeof(ManCustomSkins).GetMethod("Awake", Patches.InstanceFlags).Invoke(Singleton.Manager<ManCustomSkins>.inst, Array.Empty<object>());
+            typeof(ManCustomSkins).GetMethod("Awake", InstanceFlags).Invoke(Singleton.Manager<ManCustomSkins>.inst, Array.Empty<object>());
             #endregion
             logger.Info("BlockInjector Patches complete");
         }
         private static void RunBlockInjector()
         {
             Type DirectoryBlockLoader = BlockInjector.LoadedAssembly.GetType("Nuterra.BlockInjector.DirectoryBlockLoader");
-            MethodInfo method = DirectoryBlockLoader.GetMethod("LoadBlocks", Patches.StaticFlags);
+            MethodInfo method = DirectoryBlockLoader.GetMethod("LoadBlocks", StaticFlags);
             // load resources
             IEnumerator<object> resources = (IEnumerator<object>) method.Invoke(null, new object[] { true, false });
             while (resources.MoveNext())
@@ -904,13 +942,13 @@ namespace ModManager
         }
 
 
-        public static readonly FieldInfo InjectedEarlyHooks = typeof(ModContainer).GetFields(Patches.InstanceFlags).FirstOrDefault(field =>
+        public static readonly FieldInfo InjectedEarlyHooks = typeof(ModContainer).GetFields(InstanceFlags).FirstOrDefault(field =>
                 field.CustomAttributes.Any(attr => attr.AttributeType == typeof(CompilerGeneratedAttribute)) &&
                 (field.DeclaringType == typeof(ModContainer).GetProperty("InjectedEarlyHooks").DeclaringType) &&
                 field.FieldType.IsAssignableFrom(typeof(ModContainer).GetProperty("InjectedEarlyHooks").PropertyType) &&
                 field.Name.StartsWith("<" + typeof(ModContainer).GetProperty("InjectedEarlyHooks").Name + ">")
             );
-        public static void ProcessEarlyInits()
+        public static IEnumerator<float> ProcessEarlyInits()
         {
             // Process the EarlyInits
             logger.Info("Processing Early Inits");
@@ -940,12 +978,15 @@ namespace ModManager
                     }
                 }
                 processed++;
+                yield return CurrentOperationProgress;
             }
             CurrentOperationSpecifics = null;
             CurrentOperation = null;
+            yield return 1.0f;
+            yield break;
         }
 
-        public static void ProcessInits()
+        public static IEnumerator<float> ProcessInits()
         {
             // Process the Inits
             logger.Info("Processing Inits");
@@ -966,9 +1007,349 @@ namespace ModManager
                     logger.Error($"Failed to process Init() for {script.Name}:\n{e.ToString()}");
                 }
                 processed++;
+                yield return CurrentOperationProgress;
             }
             CurrentOperation = null;
             CurrentOperationSpecifics = null;
+            yield return 1.0f;
+            yield break;
+        }
+
+        internal static IEnumerator<float> InjectModdedCorps(ManMods manMods, ModSessionInfo newSessionInfo)
+        {
+            // Process the Inits
+            logger.Info("Injecting Modded Corps");
+            int processed = 0;
+            CurrentOperation = "Injecting modded corps";
+
+            if (newSessionInfo.CorpIDs.Count > 0)
+            {
+                int numCorps = newSessionInfo.CorpIDs.Count;
+                Dictionary<string, int> reverseLookup = (Dictionary<string, int>)ReflectedManMods.m_CorpIDReverseLookup.GetValue(manMods);
+                Dictionary<int, ModdedCorpDefinition> dictionary = new Dictionary<int, ModdedCorpDefinition>();
+                foreach (KeyValuePair<int, string> keyValuePair in newSessionInfo.CorpIDs)
+                {
+                    CurrentOperationSpecifics = $"{keyValuePair.Value}";
+                    logger.Trace("Injecting corp {corp}", keyValuePair.Value);
+                    CurrentOperationProgress = (float)processed / (float)numCorps;
+                    int corpIndex = keyValuePair.Key;
+                    ModdedCorpDefinition moddedCorpDefinition = manMods.FindModdedAsset<ModdedCorpDefinition>(keyValuePair.Value);
+                    if (moddedCorpDefinition != null)
+                    {
+                        dictionary.Add(corpIndex, moddedCorpDefinition);
+                        Singleton.Manager<ManPurchases>.inst.AddCustomCorp(corpIndex);
+                        Singleton.Manager<ManCustomSkins>.inst.AddCorp(corpIndex);
+                        ReflectedManMods.InjectCustomSkinReferences.Invoke(manMods, new object[] { 0, (FactionSubTypes)corpIndex, moddedCorpDefinition.m_DefaultSkinSlots[0] });
+                        reverseLookup.Add(moddedCorpDefinition.m_ShortName, corpIndex);
+                        logger.Info(string.Format("Injected corp {0} at ID {1}", moddedCorpDefinition.name, corpIndex));
+                    }
+                    processed++;
+                    yield return CurrentOperationProgress;
+                }
+                Singleton.Manager<ManLicenses>.inst.m_UnlockTable.AddModdedCorps(dictionary);
+            }
+
+            CurrentOperation = null;
+            CurrentOperationSpecifics = null;
+            yield return 1.0f;
+            yield break;
+        }
+
+        internal static IEnumerator<float> InjectModdedSkins(ManMods manMods, ModSessionInfo newSessionInfo)
+        {
+            // Process the Inits
+            logger.Info("Injecting Modded Skins");
+            CurrentOperation = "Injecting modded skins";
+
+            if (newSessionInfo.SkinIDsByCorp.Count > 0)
+            {
+                foreach (KeyValuePair<int, Dictionary<int, string>> keyValuePair in newSessionInfo.SkinIDsByCorp)
+                {
+                    int processed = 0;
+                    int count = keyValuePair.Value.Count;
+                    int key = keyValuePair.Key;
+                    foreach (KeyValuePair<int, string> keyValuePair2 in keyValuePair.Value)
+                    {
+                        CurrentOperationSpecifics = $"{keyValuePair2.Value}";
+                        CurrentOperationProgress = (float)processed / (float)count;
+                        logger.Trace("Injecting skin {skin}", keyValuePair2.Value);
+                        int key2 = keyValuePair2.Key;
+                        ModdedSkinDefinition moddedSkinDefinition = manMods.FindModdedAsset<ModdedSkinDefinition>(keyValuePair2.Value);
+                        if (moddedSkinDefinition != null)
+                        {
+                            if (moddedSkinDefinition.m_Albedo == null)
+                            {
+                                logger.Error(string.Format("Cannot inject skin {0} at ID {1}: Albedo texture was not found. Did you set it?", moddedSkinDefinition.name, key2));
+                            }
+                            else if (moddedSkinDefinition.m_Combined == null)
+                            {
+                                logger.Error(string.Format("Cannot inject skin {0} at ID {1}: Combined Metallic/Smoothness texture was not found. Did you set both of them?", moddedSkinDefinition.name, key2));
+                            }
+                            else if (moddedSkinDefinition.m_Emissive == null)
+                            {
+                                logger.Error(string.Format("Cannot inject skin {0} at ID {1}: Emmisive texture was not found. Did you set it?", moddedSkinDefinition.name, key2));
+                            }
+                            else if (moddedSkinDefinition.m_PreviewImage == null)
+                            {
+                                logger.Error(string.Format("Cannot inject skin {0} at ID {1}: Auto-generated preview texture was not found. This implies a problem with the TTModTool exporter.", moddedSkinDefinition.name, key2));
+                            }
+                            else if (moddedSkinDefinition.m_SkinButtonImage == null)
+                            {
+                                logger.Error(string.Format("Cannot inject skin {0} at ID {1}: Skin button texture not found. Did you set it?", moddedSkinDefinition.name, key2));
+                            }
+                            else
+                            {
+                                FactionSubTypes corpIndex = manMods.GetCorpIndex(moddedSkinDefinition.m_Corporation, null);
+                                if (corpIndex != (FactionSubTypes)(-1))
+                                {
+                                    ReflectedManMods.InjectCustomSkinReferences.Invoke(manMods, new object[] { key2, corpIndex, moddedSkinDefinition });
+                                }
+                                else
+                                {
+                                    logger.Error(string.Format("Cannot inject skin {0} at ID {1}: Corp {2} was not found - is it part of a different mod?", moddedSkinDefinition.name, key2, moddedSkinDefinition.m_Corporation));
+                                }
+                            }
+                        }
+                        else
+                        {
+                            logger.Warn(string.Format("Failed to inject skin {0} at ID {1}. Did the mod remove a skin?", keyValuePair2.Value, keyValuePair2.Key));
+                        }
+                        processed++;
+                        yield return CurrentOperationProgress;
+                    }
+                }
+            }
+
+            CurrentOperation = null;
+            CurrentOperationSpecifics = null;
+            yield return 1.0f;
+            yield break;
+        }
+
+        internal static IEnumerator<float> InjectLegacyBlocks(
+            ModSessionInfo newSessionInfo,
+            Dictionary<int, Dictionary<int, Dictionary<BlockTypes, ModdedBlockDefinition>>> gradeBlockPerCorp,
+            Dictionary<int, Sprite> blockSpriteDict
+        )
+        {
+            return null;
+        }
+
+        internal static IEnumerator<float> InjectModdedBlocks(ManMods manMods, ModSessionInfo newSessionInfo, ModSessionInfo currentSession)
+        {
+            // Process the Inits
+            logger.Info("Injecting Modded Blocks");
+            CurrentOperation = "Injecting modded blocks";
+            if (newSessionInfo.BlockIDs.Count > 0)
+            {
+                int processed = 0;
+                int numBlocks = newSessionInfo.BlockIDs.Count;
+                Dictionary<int, Dictionary<int, Dictionary<BlockTypes, ModdedBlockDefinition>>> gradeBlocksPerCorp = new Dictionary<int, Dictionary<int, Dictionary<BlockTypes, ModdedBlockDefinition>>>();
+                Dictionary<int, Sprite> blockSpriteDict = new Dictionary<int, Sprite>(16);
+                Dictionary<int, string> blockNames = (Dictionary<int, string>)ReflectedManMods.m_BlockNames.GetValue(manMods);
+                Dictionary<int, string> blockDescriptions = (Dictionary<int, string>)ReflectedManMods.m_BlockDescriptions.GetValue(manMods);
+                Dictionary<string, int> reverseLookup = (Dictionary<string, int>)ReflectedManMods.m_BlockIDReverseLookup.GetValue(manMods);
+                List<int> failedBlockIDs = new List<int>();
+                foreach (KeyValuePair<int, string> blockPair in newSessionInfo.BlockIDs)
+                {
+                    int blockIndex = blockPair.Key;
+                    string blockID = blockPair.Value;
+                    CurrentOperationSpecifics = $"{blockID}";
+                    CurrentOperationProgress = (float)processed / (float)numBlocks;
+                    logger.Trace($"Preparing to inject {blockID} (processed # {processed})");
+                    try
+                    {
+                        ModdedBlockDefinition moddedBlockDefinition = manMods.FindModdedAsset<ModdedBlockDefinition>(blockID);
+                        ModContainer mod = null;
+                        string modId;
+                        string text;
+                        if (ModUtils.SplitCompoundId(blockID, out modId, out text))
+                        {
+                            mod = manMods.FindMod(modId);
+                        }
+                        if (moddedBlockDefinition != null)
+                        {
+                            int hashCode = ItemTypeInfo.GetHashCode(ObjectTypes.Block, blockIndex);
+                            FactionSubTypes corpIndex = manMods.GetCorpIndex(moddedBlockDefinition.m_Corporation, newSessionInfo);
+                            TankBlockTemplate physicalPrefab = moddedBlockDefinition.m_PhysicalPrefab;
+                            Visible visible = physicalPrefab.GetComponent<Visible>();
+                            if (visible == null)
+                            {
+                                logger.Debug("Injected block {block} and performed first time setup", moddedBlockDefinition.name);
+                                if (visible == null)
+                                {
+                                    visible = physicalPrefab.gameObject.AddComponent<Visible>();
+                                }
+                                UnityEngine.Object component = physicalPrefab.gameObject.GetComponent<Damageable>();
+                                ModuleDamage moduleDamage = physicalPrefab.gameObject.GetComponent<ModuleDamage>();
+                                if (component == null)
+                                {
+                                    physicalPrefab.gameObject.AddComponent<Damageable>();
+                                }
+                                if (moduleDamage == null)
+                                {
+                                    moduleDamage = physicalPrefab.gameObject.AddComponent<ModuleDamage>();
+                                }
+                                TankBlock component2 = physicalPrefab.gameObject.GetComponent<TankBlock>();
+                                component2.m_BlockCategory = moddedBlockDefinition.m_Category;
+                                component2.m_BlockRarity = moddedBlockDefinition.m_Rarity;
+                                component2.m_DefaultMass = Mathf.Clamp(moddedBlockDefinition.m_Mass, 0.0001f, float.MaxValue);
+                                component2.filledCells = physicalPrefab.filledCells.ToArray();
+                                component2.attachPoints = physicalPrefab.attachPoints.ToArray();
+                                visible.m_ItemType = new ItemTypeInfo(ObjectTypes.Block, blockIndex);
+
+                                logger.Trace("Preparing to load block JSON");
+                                JSONBlockLoader.Load(mod, blockIndex, moddedBlockDefinition, component2);
+                                logger.Trace("Block JSON loaded");
+
+                                physicalPrefab = moddedBlockDefinition.m_PhysicalPrefab;
+                                physicalPrefab.gameObject.SetActive(false);
+                                Damageable component3 = physicalPrefab.GetComponent<Damageable>();
+                                moduleDamage = physicalPrefab.GetComponent<ModuleDamage>();
+                                component2 = physicalPrefab.GetComponent<TankBlock>();
+                                visible = physicalPrefab.GetComponent<Visible>();
+                                visible.m_ItemType = new ItemTypeInfo(ObjectTypes.Block, blockIndex);
+                                component3.m_DamageableType = moddedBlockDefinition.m_DamageableType;
+                                moduleDamage.maxHealth = moddedBlockDefinition.m_MaxHealth;
+                                if (moduleDamage.deathExplosion == null)
+                                {
+                                    logger.Trace("Adding default DeathExplosion");
+                                    moduleDamage.deathExplosion = manMods.m_DefaultBlockExplosion;
+                                }
+                                foreach (MeshRenderer meshRenderer in physicalPrefab.GetComponentsInChildren<MeshRenderer>())
+                                {
+                                    MeshRendererTemplate component4 = meshRenderer.GetComponent<MeshRendererTemplate>();
+                                    if (component4 != null)
+                                    {
+                                        meshRenderer.sharedMaterial = manMods.GetMaterial((int)corpIndex, component4.slot);
+                                        d.Assert(meshRenderer.sharedMaterial != null, "[Mods] Custom block " + moddedBlockDefinition.m_BlockDisplayName + " could not load texture. Corp was " + moddedBlockDefinition.m_Corporation);
+                                    }
+                                }
+                                physicalPrefab.gameObject.name = moddedBlockDefinition.name;
+                                physicalPrefab.gameObject.tag = "Untagged";
+                                physicalPrefab.gameObject.layer = LayerMask.NameToLayer("Tank");
+                                MeshCollider[] componentsInChildren2 = component2.GetComponentsInChildren<MeshCollider>();
+                                for (int i = 0; i < componentsInChildren2.Length; i++)
+                                {
+                                    componentsInChildren2[i].convex = true;
+                                }
+
+                                logger.Trace("Creating component pool");
+                                component2.transform.CreatePool(8);
+                            }
+                            else
+                            {
+                                physicalPrefab.gameObject.GetComponent<Visible>().m_ItemType = new ItemTypeInfo(ObjectTypes.Block, blockIndex);
+
+                                logger.Trace("Updating component pool");
+                                physicalPrefab.transform.CreatePool(8);
+                            }
+
+                            CurrentOperationSpecifics = moddedBlockDefinition.m_BlockDisplayName;
+                            blockNames.Add(blockIndex, moddedBlockDefinition.m_BlockDisplayName);
+                            blockDescriptions.Add(blockIndex, moddedBlockDefinition.m_BlockDescription);
+                            reverseLookup.Add(moddedBlockDefinition.name, blockIndex);
+                            Singleton.Manager<ManSpawn>.inst.AddBlockToDictionary(physicalPrefab.gameObject, blockIndex);
+                            Singleton.Manager<ManSpawn>.inst.VisibleTypeInfo.SetDescriptor<FactionSubTypes>(hashCode, corpIndex);
+                            Singleton.Manager<ManSpawn>.inst.VisibleTypeInfo.SetDescriptor<BlockCategories>(hashCode, moddedBlockDefinition.m_Category);
+                            Singleton.Manager<ManSpawn>.inst.VisibleTypeInfo.SetDescriptor<BlockRarity>(hashCode, moddedBlockDefinition.m_Rarity);
+                            Singleton.Manager<RecipeManager>.inst.RegisterCustomBlockRecipe(blockIndex, moddedBlockDefinition.m_Price);
+                            if (moddedBlockDefinition.m_Icon != null)
+                            {
+                                blockSpriteDict[blockIndex] = Sprite.Create(moddedBlockDefinition.m_Icon, new Rect(0f, 0f, (float)moddedBlockDefinition.m_Icon.width, (float)moddedBlockDefinition.m_Icon.height), Vector2.zero);
+                            }
+                            else
+                            {
+                                logger.Error($"Block {{block}} with ID {blockIndex} failed to inject because icon was not set", moddedBlockDefinition.name);
+                            }
+                            if (!gradeBlocksPerCorp.ContainsKey((int)corpIndex))
+                            {
+                                gradeBlocksPerCorp[(int)corpIndex] = new Dictionary<int, Dictionary<BlockTypes, ModdedBlockDefinition>>();
+                            }
+                            Dictionary<int, Dictionary<BlockTypes, ModdedBlockDefinition>> blockDictPerGrade = gradeBlocksPerCorp[(int)corpIndex];
+                            if (!blockDictPerGrade.ContainsKey(moddedBlockDefinition.m_Grade - 1))
+                            {
+                                blockDictPerGrade[moddedBlockDefinition.m_Grade - 1] = new Dictionary<BlockTypes, ModdedBlockDefinition>();
+                            }
+                            blockDictPerGrade[moddedBlockDefinition.m_Grade - 1].Add((BlockTypes)blockIndex, moddedBlockDefinition);
+                            JSONBlockLoader.Inject(blockIndex, moddedBlockDefinition);
+                            logger.Debug($"Injected block {{block}} at ID {blockIndex}", moddedBlockDefinition.name);
+                        }
+                        else
+                        {
+                            logger.Warn("Could not find ModdedBlockDefinition for {block}", blockID);
+                            failedBlockIDs.Add(blockIndex);
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        failedBlockIDs.Add(blockIndex);
+                        logger.Error($"FAILED to inject block {blockID}\n:{e}");
+                    }
+                    processed++;
+                    yield return CurrentOperationProgress;
+                }
+                if (failedBlockIDs.Count > 0)
+                {
+                    logger.Debug("Removing failed blocks");
+                }
+                foreach (int key2 in failedBlockIDs)
+                {
+                    newSessionInfo.BlockIDs.Remove(key2);
+                }
+                logger.Info("Injected all official blocks");
+
+                IEnumerator<float> legacyBlocksIterator = InjectLegacyBlocks(newSessionInfo, gradeBlocksPerCorp, blockSpriteDict);
+                if (legacyBlocksIterator != null)
+                {
+                    logger.Info("Injecting Legacy Modded Blocks");
+                    CurrentOperation = "Injecting legacy modded blocks";
+                    while (legacyBlocksIterator.MoveNext())
+                    {
+                        CurrentOperationProgress = legacyBlocksIterator.Current;
+                        yield return CurrentOperationProgress;
+                    }
+                }
+
+                logger.Debug("Setting up block icons");
+                Singleton.Manager<ManUI>.inst.m_SpriteFetcher.SetModSprites(ObjectTypes.Block, blockSpriteDict);
+
+                logger.Debug("Setting up BlockUnlockTable");
+                BlockUnlockTable blockUnlockTable = Singleton.Manager<ManLicenses>.inst.GetBlockUnlockTable();
+
+                logger.Trace("Removing modded blocks");
+                blockUnlockTable.RemoveModdedBlocks();
+
+                logger.Trace("Adding current modded blocks");
+                foreach (KeyValuePair<int, Dictionary<int, Dictionary<BlockTypes, ModdedBlockDefinition>>> corpBlocks in gradeBlocksPerCorp)
+                {
+                    logger.Debug($"Processing blocks in corp {corpBlocks.Key}");
+                    ModdedCorpDefinition corpDefinition = manMods.GetCorpDefinition((FactionSubTypes)corpBlocks.Key, newSessionInfo);
+                    foreach (KeyValuePair<int, Dictionary<BlockTypes, ModdedBlockDefinition>> gradeBlocks in corpBlocks.Value)
+                    {
+                        logger.Trace($"Processing blocks in grade {gradeBlocks.Key}");
+                        blockUnlockTable.AddModdedBlocks(corpBlocks.Key, gradeBlocks.Key, gradeBlocks.Value);
+                        if (manMods.IsModdedCorp((FactionSubTypes)corpBlocks.Key))
+                        {
+                            if (corpDefinition.m_RewardCorp != null)
+                            {
+                                Singleton.Manager<ManLicenses>.inst.GetRewardPoolTable().AddModdedBlockRewards(gradeBlocks.Value, gradeBlocks.Key, manMods.GetCorpIndex(corpDefinition.m_RewardCorp, null));
+                            }
+                        }
+                        else
+                        {
+                            Singleton.Manager<ManLicenses>.inst.GetRewardPoolTable().AddModdedBlockRewards(gradeBlocks.Value, gradeBlocks.Key, (FactionSubTypes)corpBlocks.Key);
+                        }
+                    }
+                }
+                logger.Trace($"Initing table");
+                blockUnlockTable.Init();
+            }
+
+            CurrentOperation = null;
+            CurrentOperationSpecifics = null;
+            yield return 1.0f;
+            yield break;
         }
 
         public static void ProcessUpdate()

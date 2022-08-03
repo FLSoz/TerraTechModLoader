@@ -19,11 +19,11 @@
     <UpdateAssemblyVersion>True</UpdateAssemblyVersion>
     <UpdateAssemblyFileVersion>True</UpdateAssemblyFileVersion>
     <UpdateAssemblyInfoVersion>False</UpdateAssemblyInfoVersion>
-    <AssemblyVersionSettings>None.IncrementOnDemand.IncrementOnDemand.Increment</AssemblyVersionSettings>
+    <AssemblyVersionSettings>None.IncrementOnDemand.IncrementOnDemand.IncrementWithResetOnIncrease</AssemblyVersionSettings>
     <UpdatePackageVersion>False</UpdatePackageVersion>
     <AssemblyInfoVersionType>SettingsVersion</AssemblyInfoVersionType>
     <InheritWinAppVersionFrom>None</InheritWinAppVersionFrom>
-    <AssemblyFileVersionSettings>None.IncrementOnDemand.IncrementOnDemand.Increment</AssemblyFileVersionSettings>
+    <AssemblyFileVersionSettings>None.IncrementOnDemand.IncrementOnDemand.IncrementWithResetOnIncrease</AssemblyFileVersionSettings>
     <AssemblyInfoVersionSettings>
     </AssemblyInfoVersionSettings>
   </PropertyGroup>
@@ -117,8 +117,11 @@
     <Compile Include="src\ManagedMod.cs" />
     <Compile Include="src\ModManager.cs" />
     <Compile Include="src\ModuleInitializer.cs" />
-    <Compile Include="src\Patches.cs" />
+    <Compile Include="src\patches\ModSessionPatches.cs" />
+    <Compile Include="src\patches\MultiplayerPatches.cs" />
+    <Compile Include="src\patches\ModLoadingPatches.cs" />
     <Compile Include="src\patches\SerializationLoggingPatches.cs" />
+    <Compile Include="src\patches\TTMMPatches.cs" />
     <Compile Include="src\QMod.cs" />
     <Compile Include="src\QModInfo.cs" />
     <Compile Include="src\ReflectedManMods.cs" />
