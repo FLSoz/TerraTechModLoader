@@ -121,8 +121,10 @@ set e=$(TargetDir)..\&gt;nul
 
 echo Copying to game
 xcopy /S /Y /R "$(TargetFileName)" !modpath!
+xcopy /S /Y /R "NLog.dll" !modpath!
 
 echo Copying to Unity
-xcopy /S /Y /R "$(TargetFileName)" !unitypath!</PostBuildEvent>
+xcopy /S /Y /R "$(TargetFileName)" !unitypath!
+xcopy /S /Y /R "NLog.dll" !unitypath!</PostBuildEvent>
   </PropertyGroup>
 </Project>

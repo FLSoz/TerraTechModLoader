@@ -13,8 +13,8 @@ namespace ModManager
 {
     internal static class WorkshopLoader
 	{
-		internal static FieldInfo m_DownloadResultCallback = typeof(SteamItemWaitForDownloadCommand).GetField("m_DownloadResultCallback", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-		internal static MethodInfo OnItemDownloaded = typeof(SteamItemWaitForDownloadCommand).GetMethod("OnItemDownloaded", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+		internal static FieldInfo m_DownloadResultCallback = AccessTools.Field(typeof(SteamItemWaitForDownloadCommand), "m_DownloadResultCallback");
+		internal static MethodInfo OnItemDownloaded = AccessTools.Method(typeof(SteamItemWaitForDownloadCommand), "OnItemDownloaded");
 
 		internal static Callback<DownloadItemResult_t> itemDownloadedCallback = Callback<DownloadItemResult_t>.Create(new Callback<DownloadItemResult_t>.DispatchDelegate(OnAnyItemDownloaded));
 		internal static Dictionary<PublishedFileId_t, SteamItemWaitForDownloadCommand> workshopToCommandMap = new Dictionary<PublishedFileId_t, SteamItemWaitForDownloadCommand>();
@@ -125,10 +125,10 @@ namespace ModManager
 		internal static class SubscribedModsPatch
 		{
 			internal const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
-			internal static FieldInfo m_SteamQuerySubscribedOp = typeof(ManMods).GetField("m_SteamQuerySubscribedOp", flags);
-			internal static FieldInfo m_WaitingOnDownloads = typeof(ManMods).GetField("m_WaitingOnDownloads", flags);
-			internal static FieldInfo m_WaitingOnWorkshopCheck = typeof(ManMods).GetField("m_WaitingOnWorkshopCheck", flags);
-			internal static MethodInfo LoadWorkshopData = typeof(ManMods).GetMethod("LoadWorkshopData", flags);
+			internal static FieldInfo m_SteamQuerySubscribedOp = AccessTools.Field(typeof(ManMods), "m_SteamQuerySubscribedOp");
+			internal static FieldInfo m_WaitingOnDownloads = AccessTools.Field(typeof(ManMods), "m_WaitingOnDownloads");
+			internal static FieldInfo m_WaitingOnWorkshopCheck = AccessTools.Field(typeof(ManMods), "m_WaitingOnWorkshopCheck");
+			internal static MethodInfo LoadWorkshopData = AccessTools.Method(typeof(ManMods), "LoadWorkshopData");
 
 			internal static void CheckForMoreSteamMods(uint page)
 			{

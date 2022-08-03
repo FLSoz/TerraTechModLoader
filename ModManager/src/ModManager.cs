@@ -30,6 +30,7 @@ namespace ModManager
     //  - these will always be loaded properly in the end
     public class ModManager : ModBase
     {
+        // Runs during ManMods.ProcessLoadingMod, where it does the Activator.CreateInstance(type) as ModBase
         static ModManager()
         {
             ModuleInitializer.Run();
@@ -89,6 +90,8 @@ namespace ModManager
         internal static string CurrentOperation = null;
         internal static string CurrentOperationSpecifics = null;
         internal static float CurrentOperationProgress = 0.0f;
+
+        internal static bool CurrentSessionLoaded = false;
 
         public override void DeInit()
         {
@@ -892,7 +895,7 @@ namespace ModManager
                     }
                     catch (Exception e)
                     {
-                        logger.Error(e, $"Failed to process EarlyInit() for {script.Name}");
+                        logger.Error($"Failed to process EarlyInit() for {script.Name}:\n{e.ToString()}");
                     }
                 }
                 processed++;
@@ -919,7 +922,7 @@ namespace ModManager
                 }
                 catch (Exception e)
                 {
-                    logger.Error(e, $"Failed to process Init() for {script.Name}");
+                    logger.Error($"Failed to process Init() for {script.Name}:\n{e.ToString()}");
                 }
                 processed++;
             }

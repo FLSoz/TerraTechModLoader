@@ -26,45 +26,45 @@ public class ModManagerSetup : ModBase
 
     public static void Run()
     {
-        d.Log("[0AssemblyLoader] Initializing assemblies...");
+        Console.WriteLine("[0AssemblyLoader] Initializing assemblies...");
         PatchAssemblyLoading();
-        d.Log($"[0AssemblyLoader] Force-loading bundled 0Harmony.dll at path {HarmonyPath}");
+        Console.WriteLine($"[0AssemblyLoader] Force-loading bundled 0Harmony.dll at path {HarmonyPath}");
         Harmony = AppDomain.CurrentDomain.Load("0Harmony.dll");
-        d.Log($"[0AssemblyLoader] Force-loading bundled NLog.dll at path {NLogPath}");
+        Console.WriteLine($"[0AssemblyLoader] Force-loading bundled NLog.dll at path {NLogPath}");
         NLog = AppDomain.CurrentDomain.Load("NLog.dll");
-        d.Log($"[0AssemblyLoader] Force-loading bundled NLogManager.dll at path {NLogManagerPath}");
+        Console.WriteLine($"[0AssemblyLoader] Force-loading bundled NLogManager.dll at path {NLogManagerPath}");
         NLogManager = AppDomain.CurrentDomain.Load("NLogManager.dll");
-        d.Log($"[0AssemblyLoader] Force-loading bundled ModManager.dll at path {ModManagerPath}");
+        Console.WriteLine($"[0AssemblyLoader] Force-loading bundled ModManager.dll at path {ModManagerPath}");
         ModManager = AppDomain.CurrentDomain.Load("TTModManager.dll");
 
         Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
 
         try
         {
-            d.Log("[0AssemblyLoader] Force getting Harmony types");
+            Console.WriteLine("[0AssemblyLoader] Force getting Harmony types");
             Harmony.GetExportedTypes();
-            d.Log("[0AssemblyLoader] Force getting NLog types");
+            Console.WriteLine("[0AssemblyLoader] Force getting NLog types");
             NLog.GetExportedTypes();
-            d.Log("[0AssemblyLoader] Force getting NLogManager types");
+            Console.WriteLine("[0AssemblyLoader] Force getting NLogManager types");
             NLogManager.GetTypes();
-            d.Log("[0AssemblyLoader] Force getting ModManager types");
+            Console.WriteLine("[0AssemblyLoader] Force getting ModManager types");
             ModManager.GetTypes();
         }
         catch (System.Reflection.ReflectionTypeLoadException ex)
         {
-            d.Log("[0AssemblyLoader] FAILED to load types!");
+            Console.WriteLine("[0AssemblyLoader] FAILED to load types!");
             Exception[] exceptions = ex.LoaderExceptions;
             foreach (Exception exception in exceptions)
             {
-                d.Log(exception);
+                Console.WriteLine(exception);
             }
         }
-        d.Log("Loaded assemblies:\n" + String.Join("\n", assemblies.Select(x => x.FullName)));
-        UnpatchAssemblyLoading();
+        // Console.WriteLine("Loaded assemblies:\n" + String.Join("\n", assemblies.Select(x => x.FullName)));
+        // UnpatchAssemblyLoading();
     }
 
-    internal static readonly FieldInfo m_CurrentSession = typeof(ManMods).GetField("m_CurrentSession", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-    internal static readonly FieldInfo m_Mods = typeof(ManMods).GetField("m_Mods", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+    internal static readonly FieldInfo m_CurrentSession = typeof(ManMods).GetField("m_CurrentSession", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+    internal static readonly FieldInfo m_Mods = typeof(ManMods).GetField("m_Mods", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
 
     public static Assembly ResolveAssembly(object sender, ResolveEventArgs args)
     {
@@ -82,13 +82,13 @@ public class ModManagerSetup : ModBase
 
     public static void PatchAssemblyLoading()
     {
-        AppDomain.CurrentDomain.AssemblyLoad += delegate (object sender, AssemblyLoadEventArgs args)
+        /* AppDomain.CurrentDomain.AssemblyLoad += delegate (object sender, AssemblyLoadEventArgs args)
         {
             Assembly assembly = args.LoadedAssembly;
-            d.Log("[0AssemblyLoader] Loaded Assembly " + assembly.FullName);
-        };
+            Console.WriteLine("[0AssemblyLoader] Loaded Assembly " + assembly.FullName);
+        }; */
         AppDomain.CurrentDomain.AssemblyResolve += ResolveAssembly;
-        d.Log("[0AssemblyLoader] Patched assembly loading?");
+        // Console.WriteLine("[0AssemblyLoader] Patched assembly loading?");
     }
     public static void UnpatchAssemblyLoading()
     {

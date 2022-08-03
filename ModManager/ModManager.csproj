@@ -48,6 +48,10 @@
       <HintPath>..\..\..\..\Steam\steamapps\common\TerraTech\TerraTechWin64_Data\Managed\DebugWrapper.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <Reference Include="Ionic.Zlib">
+      <HintPath>..\..\..\..\Steam\steamapps\common\TerraTech\TerraTechWin64_Data\Managed\Ionic.Zlib.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
     <Reference Include="Newtonsoft.Json, Version=9.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\..\..\..\Steam\steamapps\common\TerraTech\TerraTechWin64_Data\Managed\Newtonsoft.Json.dll</HintPath>
@@ -55,6 +59,7 @@
     </Reference>
     <Reference Include="NLog, Version=5.0.0.0, Culture=neutral, PublicKeyToken=5120e14c03d0593c, processorArchitecture=MSIL">
       <HintPath>..\packages\NLog.5.0.0\lib\net46\NLog.dll</HintPath>
+      <Private>False</Private>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Configuration" />
@@ -101,6 +106,7 @@
     <Compile Include="src\ModManager.cs" />
     <Compile Include="src\ModuleInitializer.cs" />
     <Compile Include="src\Patches.cs" />
+    <Compile Include="src\patches\SerializationLoggingPatches.cs" />
     <Compile Include="src\QMod.cs" />
     <Compile Include="src\QModInfo.cs" />
     <Compile Include="src\ReflectedManMods.cs" />

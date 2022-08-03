@@ -1,12 +1,9 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.IO;
-using System.Reflection;
-using System.Runtime.CompilerServices;
+using Newtonsoft.Json;
+using HarmonyLib;
 using ModManager.Datastructures;
+using NLog;
+using ModManager.patches;
 
 namespace ModManager
 {
@@ -59,6 +56,10 @@ namespace ModManager
                         ModManager.RequestConfiguredModSession();
                     }
                 }
+
+                // Patch snapshot load failure logging
+                SerializationLoggingPatches.Setup();
+
                 Inited = true;
             }
         }

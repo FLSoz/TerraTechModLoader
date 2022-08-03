@@ -12,8 +12,8 @@ using HarmonyLib;
 using UnityEngine;
 using Payload.UI.Commands.Steam;
 using TerraTech.Network;
+using HarmonyLib;
 using Steamworks;
-
 
 namespace ModManager
 {
@@ -58,7 +58,7 @@ namespace ModManager
         [HarmonyPatch(typeof(ManMods), "PurgeModdedContentFromGame")]
         public static class PatchModuleDeregistration
         {
-            internal static readonly FieldInfo sLoaders = typeof(JSONBlockLoader).GetField("sLoaders", StaticFlags);
+            internal static readonly FieldInfo sLoaders = AccessTools.Field(typeof(JSONBlockLoader), "sLoaders");
             [HarmonyPostfix]
             internal static void Postfix(ModSessionInfo oldSessionInfo)
             {
@@ -260,8 +260,8 @@ namespace ModManager
         [HarmonyPatch(typeof(ManMods), "PreLobbyCreated")]
         public static class PatchLobbyCreation
         {
-            internal static FieldInfo m_CurrentLobbySession = typeof(ManMods).GetField("m_CurrentLobbySession", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-            internal static FieldInfo m_CurrentSession = typeof(ManMods).GetField("m_CurrentSession", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            internal static FieldInfo m_CurrentLobbySession = AccessTools.Field(typeof(ManMods), "m_CurrentLobbySession");
+            internal static FieldInfo m_CurrentSession = AccessTools.Field(typeof(ManMods), "m_CurrentSession");
 
             internal static void DeepCopy<T1, T2>(Dictionary<T1, T2> source, Dictionary<T1, T2> target)
             {
@@ -365,6 +365,149 @@ namespace ModManager
                 ModManager.ProcessEarlyInits();
                 ModManager.ProcessInits();
                 ModManager.logger.Info("InitModScripts End");
+                return false;
+            }
+        }
+
+        [HarmonyPatch(typeof(ManMods), "UpdateModSession")]
+        public static class PatchModSession
+        {
+            internal static void AutoAddModsToSession(ManMods __instance, ModSessionInfo session)
+            {
+                if (session != null)
+                {
+                    Dictionary<string, ModContainer> mods = (Dictionary<string, ModContainer>)ReflectedManMods.m_Mods.GetValue(__instance);
+                    using (Dictionary<string, ModContainer>.Enumerator enumerator = mods.GetEnumerator())
+                    {
+                        while (enumerator.MoveNext())
+                        {
+                            KeyValuePair<string, ModContainer> pair = enumerator.Current;
+                            string modID = pair.Key;
+                            bool local = pair.Value.Contents.m_WorkshopId == PublishedFileId_t.Invalid;
+                            // If it's multiplayer, we allow remote mods. Else, we disallow remote mods
+                            if (pair.Value.IsLoaded && !session.Mods.ContainsKey(modID) && ((!session.m_Multiplayer && !pair.Value.IsRemote) || (!local && session.m_Multiplayer)))
+                            {
+                                session.Mods.Add(modID, pair.Value.Contents.m_WorkshopId.m_PublishedFileId);
+                            }
+                        }
+                        return;
+                    }
+                }
+                d.LogError("[Mods] Called AutoAddModsToSession for null session");
+            }
+
+            [HarmonyPrefix]
+            internal static bool Prefix(ref ManMods __instance)
+            {
+                ReflectedManMods.CheckReparseAllJsons.Invoke(__instance, null);
+                ModSessionInfo requestedSession = (ModSessionInfo) ReflectedManMods.m_RequestedSession.GetValue(__instance);
+                ModSessionInfo currentSession = (ModSessionInfo) ReflectedManMods.m_CurrentSession.GetValue(__instance);
+                if (requestedSession != null && requestedSession != currentSession)
+                {
+                    bool loadingRequestedSessionInProgress = (bool) ReflectedManMods.m_LoadingRequestedSessionInProgress.GetValue(__instance);
+                    if (!loadingRequestedSessionInProgress)
+                    {
+                        if (
+                            (bool)ReflectedManMods.m_AutoAddModsToAuthoritativeSessions.GetValue(__instance) &&
+                            requestedSession.m_Authoritative &&
+                            Singleton.Manager<ManGameMode>.inst.GetCurrentGameType() != ManGameMode.GameType.Gauntlet &&
+                            Singleton.Manager<ManGameMode>.inst.GetCurrentGameType() != ManGameMode.GameType.SumoShowdown &&
+                            Singleton.Manager<ManGameMode>.inst.GetCurrentGameType() != ManGameMode.GameType.RacingChallenge &&
+                            Singleton.Manager<ManGameMode>.inst.GetCurrentGameType() != ManGameMode.GameType.FlyingChallenge
+                        )
+                        {
+                            // This normally adds all the global mods to the session. We don't bother doing this since we know the session will be the same
+                            if (ModManager.CurrentSessionLoaded && (currentSession.m_Multiplayer == requestedSession.m_Multiplayer))
+                            {
+                                ModManager.logger.Info("Mod session remaining the same");
+                                ReflectedManMods.m_RequestedSession.SetValue(__instance, null);
+                            }
+                            else
+                            {
+                                // Either we're switching to or from multiplayer, or the current session is not loaded
+                                ModManager.logger.Info("Determining mod session");
+                                AutoAddModsToSession(__instance, requestedSession);
+                                ReflectedManMods.m_LoadingRequestedSessionInProgress.SetValue(__instance, true);
+                                ModManager.CurrentSessionLoaded = false;
+                            }
+                        }
+                        else
+                        {
+                            ReflectedManMods.m_LoadingRequestedSessionInProgress.SetValue(__instance, true);
+                            ModManager.logger.Info("Switching mod session");
+                            ModManager.CurrentSessionLoaded = false;
+                        }
+                    }
+                    loadingRequestedSessionInProgress = (bool)ReflectedManMods.m_LoadingRequestedSessionInProgress.GetValue(__instance);
+                    if (loadingRequestedSessionInProgress && !__instance.HasPendingLoads())
+                    {
+                        ReflectedManMods.m_LoadingRequestedSessionInProgress.SetValue(__instance, false);
+                        if (requestedSession.m_Authoritative)
+                        {
+                            Dictionary<string, string> corpModLookup = new Dictionary<string, string>();
+                            Dictionary<string, List<string>> corpSkinLookup = new Dictionary<string, List<string>>();
+                            List<string> moddedBlocks = new List<string>();
+                            foreach (KeyValuePair<string, ModContainer> pair in (Dictionary<string, ModContainer>) ReflectedManMods.m_Mods.GetValue(__instance))
+                            {
+                                string modID = pair.Key;
+                                if (!pair.Value.IsRemote && requestedSession.Mods.ContainsKey(modID))
+                                {
+                                    foreach (ModdedCorpDefinition moddedCorpDefinition in pair.Value.Contents.m_Corps)
+                                    {
+                                        if (!corpModLookup.ContainsKey(moddedCorpDefinition.name))
+                                        {
+                                            ModManager.logger.Debug("Found corp {corp} ({short}) in mod {mod}", moddedCorpDefinition.name, moddedCorpDefinition.m_ShortName, modID);
+                                            corpModLookup.Add(moddedCorpDefinition.name, modID);
+                                        }
+                                        else
+                                        {
+                                            ModManager.logger.Warn(
+                                                "Failed to add duplicate corp {corp} from mod {key} because we already have one from mod {mod}",
+                                                moddedCorpDefinition.name,
+                                                modID,
+                                                corpModLookup[moddedCorpDefinition.name]
+                                            );
+                                        }
+                                    }
+                                    foreach (ModdedSkinDefinition moddedSkinDefinition in pair.Value.Contents.m_Skins)
+                                    {
+                                        if (!corpSkinLookup.ContainsKey(moddedSkinDefinition.m_Corporation))
+                                        {
+                                            corpSkinLookup[moddedSkinDefinition.m_Corporation] = new List<string>();
+                                        }
+                                        ModManager.logger.Debug("Found skin {skin} for corp {corp}", moddedSkinDefinition.name, moddedSkinDefinition.m_Corporation);
+                                        corpSkinLookup[moddedSkinDefinition.m_Corporation].Add(ModUtils.CreateCompoundId(modID, moddedSkinDefinition.name));
+                                    }
+                                    foreach (ModdedBlockDefinition moddedBlockDefinition in pair.Value.Contents.m_Blocks)
+                                    {
+                                        ModManager.logger.Trace("Found modded block {block} in mod {mod}", moddedBlockDefinition.name, modID);
+                                        moddedBlocks.Add(ModUtils.CreateCompoundId(modID, moddedBlockDefinition.name));
+                                    }
+                                }
+                            }
+                            List<string> moddedCorps = new List<string>(corpModLookup.Count);
+                            foreach (KeyValuePair<string, string> keyValuePair2 in corpModLookup)
+                            {
+                                moddedCorps.Add(ModUtils.CreateCompoundId(keyValuePair2.Value, keyValuePair2.Key));
+                            }
+                            ReflectedManMods.AutoAssignSessionIDs.Invoke(__instance, new object[] { requestedSession, moddedCorps, corpSkinLookup, moddedBlocks });
+                        }
+                        ModManager.logger.Debug("Purging modded content");
+                        ReflectedManMods.PurgeModdedContentFromGame.Invoke(__instance, new object[] { currentSession });
+                        if ((bool) ReflectedManMods.m_ReloadAllPending.GetValue(__instance))
+                        {
+                            ModManager.logger.Debug("Purged content, but reload pending. Moving to reload step.");
+                            ReflectedManMods.m_CurrentSession.SetValue(__instance, null);
+                            ReflectedManMods.CheckReloadAllMods.Invoke(__instance, null);
+                            return false;
+                        }
+                        ModManager.logger.Debug("Purged content, injecting new content.");
+                        ReflectedManMods.m_CurrentSession.SetValue(__instance, requestedSession);
+                        ReflectedManMods.m_RequestedSession.SetValue(__instance, null);
+                        ReflectedManMods.InjectModdedContentIntoGame.Invoke(__instance, new object[] { requestedSession });
+                        ModManager.CurrentSessionLoaded = true;
+                    }
+                }
                 return false;
             }
         }
