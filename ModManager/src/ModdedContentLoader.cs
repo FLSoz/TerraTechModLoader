@@ -100,21 +100,11 @@ namespace ModManager
                         {
                             CurrentProcess = ProcessEarlyInits();
                         }
-                        float waitTime = Time.realtimeSinceStartup + maxProcessingInterval;
-                        while (true)
+                        if (!CurrentProcess.MoveNext())
                         {
-                            bool toContinue = CurrentProcess.MoveNext();
-                            if (!toContinue)
-                            {
-                                CurrentProcess = null;
-                                RequestRestartIfNeeded();
-                                this.CurrentStage = ModdedContentLoader.ModLoadStage.Init;
-                                break;
-                            }
-                            if (Time.realtimeSinceStartup > waitTime)
-                            {
-                                break;
-                            }
+                            RequestRestartIfNeeded();
+                            this.CurrentStage = ModdedContentLoader.ModLoadStage.Init;
+                            CurrentProcess = null;
                         }
                         break;
                     }
@@ -124,20 +114,10 @@ namespace ModManager
                         {
                             CurrentProcess = ProcessInits();
                         }
-                        float waitTime = Time.realtimeSinceStartup + maxProcessingInterval;
-                        while (true)
+                        if (!CurrentProcess.MoveNext())
                         {
-                            bool toContinue = CurrentProcess.MoveNext();
-                            if (!toContinue)
-                            {
-                                CurrentProcess = null;
-                                this.CurrentStage = ModdedContentLoader.ModLoadStage.Corps;
-                                break;
-                            }
-                            if (Time.realtimeSinceStartup > waitTime)
-                            {
-                                break;
-                            }
+                            CurrentProcess = null;
+                            this.CurrentStage = ModdedContentLoader.ModLoadStage.Corps;
                         }
                         break;
                     }
@@ -147,20 +127,10 @@ namespace ModManager
                         {
                             CurrentProcess = InjectModdedCorps();
                         }
-                        float waitTime = Time.realtimeSinceStartup + maxProcessingInterval;
-                        while (true)
+                        if (!CurrentProcess.MoveNext())
                         {
-                            bool toContinue = CurrentProcess.MoveNext();
-                            if (!toContinue)
-                            {
-                                CurrentProcess = null;
-                                this.CurrentStage = ModdedContentLoader.ModLoadStage.Skins;
-                                break;
-                            }
-                            if (Time.realtimeSinceStartup > waitTime)
-                            {
-                                break;
-                            }
+                            CurrentProcess = null;
+                            this.CurrentStage = ModdedContentLoader.ModLoadStage.Skins;
                         }
                         break;
                     }
@@ -170,20 +140,10 @@ namespace ModManager
                         {
                             CurrentProcess = InjectModdedSkins();
                         }
-                        float waitTime = Time.realtimeSinceStartup + maxProcessingInterval;
-                        while (true)
+                        if (!CurrentProcess.MoveNext())
                         {
-                            bool toContinue = CurrentProcess.MoveNext();
-                            if (!toContinue)
-                            {
-                                CurrentProcess = null;
-                                this.CurrentStage = ModdedContentLoader.ModLoadStage.Blocks;
-                                break;
-                            }
-                            if (Time.realtimeSinceStartup > waitTime)
-                            {
-                                break;
-                            }
+                            CurrentProcess = null;
+                            this.CurrentStage = ModdedContentLoader.ModLoadStage.Blocks;
                         }
                         break;
                     }
