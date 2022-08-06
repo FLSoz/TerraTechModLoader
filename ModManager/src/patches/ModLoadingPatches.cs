@@ -55,10 +55,29 @@ namespace ModManager.patches
                     if (contents != null)
                     {
                         dumped = true;
+                        Transform text = __instance.loadingBar.transform.GetChild(0);
                         Transform Background = __instance.loadingBar.transform.GetChild(1);
                         Transform Fill = Background.GetChild(0);
                         Image background = Background.GetComponent<Image>();
                         Image fill = Fill.GetComponent<Image>();
+
+                        Texture2D ttsmmIcon = contents.FindAsset("ttsmm") as Texture2D;
+                        Transform Icon = GameObject.Instantiate(Fill);
+                        Icon.transform.parent = __instance.loadingBar.transform;
+                        Icon.transform.localPosition = new Vector3(0, 100.0f, 0);
+                        Icon.transform.localScale = Vector3.one;
+                        Image icon = Icon.GetComponent<Image>();
+
+                        Sprite iconSprite = Sprite.Create(ttsmmIcon, new Rect(0, 0, ttsmmIcon.width, ttsmmIcon.height), new Vector2(0.5f, 0.5f), fill.sprite.pixelsPerUnit, 10);
+                        icon.sprite = iconSprite;
+                        icon.fillAmount = 1.0f;
+                        icon.SetNativeSize();
+
+                        // Resolution resolution = Screen.currentResolution;
+
+                        text.localPosition = text.localPosition + 200 * Vector3.down;
+                        Background.localPosition = Background.localPosition + 200 * Vector3.down;
+
                         ModManager.logger.Debug("Got target images");
                         Texture2D fillTex = contents.FindAsset("fill") as Texture2D;
                         Texture2D backgroundTex = contents.FindAsset("background") as Texture2D;

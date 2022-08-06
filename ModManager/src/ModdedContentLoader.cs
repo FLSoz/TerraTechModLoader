@@ -153,11 +153,21 @@ namespace ModManager
                         {
                             CurrentProcess = InjectModdedBlocks();
                         }
-                        if (!CurrentProcess.MoveNext())
+
+                        float waitTime = Time.realtimeSinceStartup + maxProcessingInterval;
+                        while (true)
                         {
-                            Singleton.Manager<ManSpawn>.inst.OnDLCLoadComplete();
-                            CurrentProcess = null;
-                            return true;
+                            bool toContinue = CurrentProcess.MoveNext();
+                            if (!toContinue)
+                            {
+                                Singleton.Manager<ManSpawn>.inst.OnDLCLoadComplete();
+                                CurrentProcess = null;
+                                return true;
+                            }
+                            if (Time.realtimeSinceStartup > waitTime)
+                            {
+                                break;
+                            }
                         }
                         break;
                     }
@@ -169,6 +179,8 @@ namespace ModManager
             }
             return false;
         }
+
+        private const float maxProcessingInterval = 0.05f;
 
         private void RequestRestartIfNeeded()
         {
@@ -266,30 +278,43 @@ namespace ModManager
             foreach (WrappedMod script in ModManager.EarlyInitQueue)
             {
                 ModManager.CurrentOperationSpecifics = $"Processing {script.Name} EarlyInit()";
-                ModManager.CurrentOperationProgress = (float)processed / (float)numMods;
+                bool failed = false;
                 if (!script.earlyInitRun)
                 {
-                    try
+                    logger.Debug("Processing EarlyInit for mod {}", script.Name);
+                    IEnumerator<float> iterator = script.EarlyInit();
+                    while (true)
                     {
-                        logger.Debug("Processing EarlyInit for mod {}", script.Name);
-                        IEnumerator<float> iterator = script.EarlyInit();
-                        while (iterator.MoveNext())
+                        try
                         {
-                            ModManager.CurrentOperationSpecificProgress = iterator.Current;
+                            bool toContinue = iterator.MoveNext();
+                            if (toContinue)
+                            {
+                                ModManager.CurrentOperationSpecificProgress = iterator.Current;
+                            }
+                            else
+                            {
+                                break;
+                            }
                         }
-                        script.earlyInitRun = true;
-
-                        ModContainer container = ModManager.modMetadata[script];
-                        ModManager.InjectedEarlyHooks.SetValue(container, true);
-
-                        ModManager.containersWithEarlyHooks.Add(container);
-                    }
-                    catch (Exception e)
-                    {
-                        logger.Error($"Failed to process EarlyInit() for {script.Name}:\n{e.ToString()}");
+                        catch (Exception e)
+                        {
+                            logger.Error($"Failed to process EarlyInit() for {script.Name}:\n{e.ToString()}");
+                            failed = true;
+                            break;
+                        }
+                        yield return null;
                     }
                 }
+                ModContainer container = ModManager.modMetadata[script];
+                if (!failed)
+                {
+                    script.earlyInitRun = true;
+                    ModManager.InjectedEarlyHooks.SetValue(container, true);
+                }
+                ModManager.containersWithEarlyHooks.Add(container);
                 processed++;
+                ModManager.CurrentOperationProgress = (float)processed / (float)numMods;
                 yield return null;
             }
             ModManager.CurrentOperationSpecifics = null;
@@ -307,21 +332,31 @@ namespace ModManager
             foreach (WrappedMod script in ModManager.InitQueue)
             {
                 ModManager.CurrentOperationSpecifics = $"Processing {script.Name} Init()";
-                ModManager.CurrentOperationProgress = (float)processed / (float)numMods;
                 logger.Debug("Processing Init for mod {}", script.Name);
-                try
+                IEnumerator<float> iterator = script.Init();
+                while (true)
                 {
-                    IEnumerator<float> iterator = script.Init();
-                    while (iterator.MoveNext())
+                    try
                     {
-                        ModManager.CurrentOperationSpecificProgress = iterator.Current;
+                        bool toContinue = iterator.MoveNext();
+                        if (toContinue)
+                        {
+                            ModManager.CurrentOperationSpecificProgress = iterator.Current;
+                        }
+                        else
+                        {
+                            break;
+                        }
                     }
-                }
-                catch (Exception e)
-                {
-                    logger.Error($"Failed to process Init() for {script.Name}:\n{e.ToString()}");
+                    catch (Exception e)
+                    {
+                        logger.Error($"Failed to process Init() for {script.Name}:\n{e.ToString()}");
+                        break;
+                    }
+                    yield return null;
                 }
                 processed++;
+                ModManager.CurrentOperationProgress = (float)processed / (float)numMods;
                 yield return null;
             }
             ModManager.CurrentOperationSpecifics = null;
@@ -345,7 +380,6 @@ namespace ModManager
                 {
                     ModManager.CurrentOperationSpecifics = $"{keyValuePair.Value}";
                     logger.Trace("Injecting corp {corp}", keyValuePair.Value);
-                    ModManager.CurrentOperationProgress = (float)processed / (float)numCorps;
                     int corpIndex = keyValuePair.Key;
                     ModdedCorpDefinition moddedCorpDefinition = manMods.FindModdedAsset<ModdedCorpDefinition>(keyValuePair.Value);
                     if (moddedCorpDefinition != null)
@@ -358,6 +392,7 @@ namespace ModManager
                         logger.Info(string.Format("Injected corp {0} at ID {1}", moddedCorpDefinition.name, corpIndex));
                     }
                     processed++;
+                    ModManager.CurrentOperationProgress = (float)processed / (float)numCorps;
                     yield return null;
                 }
                 Singleton.Manager<ManLicenses>.inst.m_UnlockTable.AddModdedCorps(dictionary);
@@ -383,7 +418,6 @@ namespace ModManager
                     foreach (KeyValuePair<int, string> keyValuePair2 in keyValuePair.Value)
                     {
                         ModManager.CurrentOperationSpecifics = $"{keyValuePair2.Value}";
-                        ModManager.CurrentOperationProgress = (float)processed / (float)count;
                         logger.Trace("Injecting skin {skin}", keyValuePair2.Value);
                         int key2 = keyValuePair2.Key;
                         ModdedSkinDefinition moddedSkinDefinition = manMods.FindModdedAsset<ModdedSkinDefinition>(keyValuePair2.Value);
@@ -427,6 +461,7 @@ namespace ModManager
                             logger.Warn(string.Format("Failed to inject skin {0} at ID {1}. Did the mod remove a skin?", keyValuePair2.Value, keyValuePair2.Key));
                         }
                         processed++;
+                        ModManager.CurrentOperationProgress = (float)processed / (float)count;
                         yield return null;
                     }
                 }
