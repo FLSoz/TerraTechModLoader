@@ -100,11 +100,21 @@ namespace ModManager
                         {
                             CurrentProcess = ProcessEarlyInits();
                         }
-                        if (!CurrentProcess.MoveNext())
+                        float waitTime = Time.realtimeSinceStartup + maxProcessingInterval;
+                        while (true)
                         {
-                            RequestRestartIfNeeded();
-                            this.CurrentStage = ModdedContentLoader.ModLoadStage.Init;
-                            CurrentProcess = null;
+                            bool toContinue = CurrentProcess.MoveNext();
+                            if (!toContinue)
+                            {
+                                CurrentProcess = null;
+                                RequestRestartIfNeeded();
+                                this.CurrentStage = ModdedContentLoader.ModLoadStage.Init;
+                                break;
+                            }
+                            if (Time.realtimeSinceStartup > waitTime)
+                            {
+                                break;
+                            }
                         }
                         break;
                     }
@@ -114,10 +124,20 @@ namespace ModManager
                         {
                             CurrentProcess = ProcessInits();
                         }
-                        if (!CurrentProcess.MoveNext())
+                        float waitTime = Time.realtimeSinceStartup + maxProcessingInterval;
+                        while (true)
                         {
-                            CurrentProcess = null;
-                            this.CurrentStage = ModdedContentLoader.ModLoadStage.Corps;
+                            bool toContinue = CurrentProcess.MoveNext();
+                            if (!toContinue)
+                            {
+                                CurrentProcess = null;
+                                this.CurrentStage = ModdedContentLoader.ModLoadStage.Corps;
+                                break;
+                            }
+                            if (Time.realtimeSinceStartup > waitTime)
+                            {
+                                break;
+                            }
                         }
                         break;
                     }
@@ -127,10 +147,20 @@ namespace ModManager
                         {
                             CurrentProcess = InjectModdedCorps();
                         }
-                        if (!CurrentProcess.MoveNext())
+                        float waitTime = Time.realtimeSinceStartup + maxProcessingInterval;
+                        while (true)
                         {
-                            CurrentProcess = null;
-                            this.CurrentStage = ModdedContentLoader.ModLoadStage.Skins;
+                            bool toContinue = CurrentProcess.MoveNext();
+                            if (!toContinue)
+                            {
+                                CurrentProcess = null;
+                                this.CurrentStage = ModdedContentLoader.ModLoadStage.Skins;
+                                break;
+                            }
+                            if (Time.realtimeSinceStartup > waitTime)
+                            {
+                                break;
+                            }
                         }
                         break;
                     }
@@ -140,10 +170,20 @@ namespace ModManager
                         {
                             CurrentProcess = InjectModdedSkins();
                         }
-                        if (!CurrentProcess.MoveNext())
+                        float waitTime = Time.realtimeSinceStartup + maxProcessingInterval;
+                        while (true)
                         {
-                            CurrentProcess = null;
-                            this.CurrentStage = ModdedContentLoader.ModLoadStage.Blocks;
+                            bool toContinue = CurrentProcess.MoveNext();
+                            if (!toContinue)
+                            {
+                                CurrentProcess = null;
+                                this.CurrentStage = ModdedContentLoader.ModLoadStage.Blocks;
+                                break;
+                            }
+                            if (Time.realtimeSinceStartup > waitTime)
+                            {
+                                break;
+                            }
                         }
                         break;
                     }
