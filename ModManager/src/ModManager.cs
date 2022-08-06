@@ -51,11 +51,10 @@ namespace ModManager
         internal static PublishedFileId_t WorkshopID = new PublishedFileId_t(2790161231);
         internal static string ExecutablePath;
 
-        internal static readonly string TTSteamDir = Path.GetFullPath(Path.Combine(
-            AppDomain.CurrentDomain.GetAssemblies()
-            .Where(assembly => assembly.GetName().Name == "Assembly-CSharp").First().Location
-            .Replace("Assembly-CSharp.dll", ""), @"../../"
-        ));
+        internal static readonly Assembly AssemblyCSharp = AppDomain.CurrentDomain.GetAssemblies()
+            .Where(assembly => assembly.GetName().Name == "Assembly-CSharp").First();
+
+        internal static readonly string TTSteamDir = Path.GetFullPath(Path.Combine(AssemblyCSharp.Location.Replace("Assembly-CSharp.dll", ""), @"../../"));
         
         // internal static readonly string TTSteamDir = @"E:/Steam/steamapps/common/TerraTech";
         private static readonly string QModsDir = Path.Combine(TTSteamDir, "QMods");

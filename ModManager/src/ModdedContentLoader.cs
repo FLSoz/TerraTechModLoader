@@ -837,10 +837,127 @@ namespace ModManager
             yield break;
         }
 
+        private static FieldInfo m_MaterialPairsInstances = AccessTools.Field(typeof(ManTechMaterialSwap), "m_MaterialPairsInstances");
+        private static FieldInfo m_MinEmissiveForCorp = AccessTools.Field(typeof(ManTechMaterialSwap), "m_MinEmissiveForCorp");
+        private static FieldInfo m_GroupTextureArray = AccessTools.Field(typeof(ManTechMaterialSwap), "m_GroupTextureArray");
+
+        private static MethodInfo CopyCorpArraySkinTextures = AccessTools.Method(typeof(ManTechMaterialSwap), "CopyCorpArraySkinTextures");
+        private static MethodInfo MakeCorpArrayTexture = AccessTools.Method(typeof(ManTechMaterialSwap), "MakeCorpArrayTexture");
+
+        private static Type GroupTexture = AccessTools.Inner(typeof(ManTechMaterialSwap), "GroupTextureArray");
+        private static ConstructorInfo GroupTextureConstructor = AccessTools.Constructor(GroupTexture, parameters: new Type[] { typeof(Texture2D), typeof(Texture2D), typeof(Texture2D) });
+
+        private IEnumerator RebuildCorpArrayTextures()
+        {
+            ManTechMaterialSwap manTechMaterialSwap = Singleton.Manager<ManTechMaterialSwap>.inst;
+            manTechMaterialSwap.m_FinalCorpMaterials.Clear();
+            List<ManTechMaterialSwap.MatReplacePairs> replacePairs = (List<ManTechMaterialSwap.MatReplacePairs>)m_MaterialPairsInstances.GetValue(manTechMaterialSwap);
+
+            for (int i = 0; i < replacePairs.Count; i++)
+            {
+                List<SkinTextures> corpSkinTextureInfos = Singleton.Manager<ManCustomSkins>.inst.GetCorpSkinTextureInfos(manTechMaterialSwap.m_MaterialsToSwap[i].m_Corp);
+                logger.Info($"Rebuilding Texture for corp index {manTechMaterialSwap.m_MaterialsToSwap[i].m_Corp}");
+                int count = corpSkinTextureInfos.Count;
+                Texture2D albedo = null;
+                Texture2D metal = null;
+                Texture2D emissive = null;
+                for (int j = 0; j < replacePairs[i].m_Materials.Length; j++)
+                {
+                    Material material = replacePairs[i].m_Materials[j];
+                    Material material2 = manTechMaterialSwap.m_MaterialsToSwap[i][j].m_Material;
+                    if (count > 1 && material != null && material2 != null)
+                    {
+                        material.EnableKeyword("_SKINS");
+                        if ((byte)j == 0)
+                        {
+                            SetupMaterial((int)manTechMaterialSwap.m_MaterialsToSwap[i].m_Corp, material,
+                                (Texture2D)material2.GetTexture("_MainTex"),
+                                (Texture2D)material2.GetTexture("_MetallicGlossMap"),
+                                (Texture2D)material2.GetTexture("_EmissionMap"),
+                                corpSkinTextureInfos, count);
+                        }
+                        else if ((byte)j == 1)
+                        {
+                            material.SetTexture("_MainTex", albedo);
+                            material.SetTexture("_MetallicGlossMap", metal);
+                            material.SetTexture("_EmissionMap", emissive);
+                            material.SetFloat("_RcpNumSkinsU", 1f / (float)(count / 8 + 1));
+                            material.SetFloat("_RcpNumSkinsV", 1f / (float)Math.Min(count, 8));
+                        }
+                    }
+                    replacePairs[i].m_Materials[j] = material;
+                    yield return null;
+                }
+            }
+            yield break;
+        }
+
+        private IEnumerator BuildCustomCorpArrayTextures(Dictionary<int, List<ModdedSkinDefinition>> corps)
+        {
+            ManTechMaterialSwap manTechMaterialSwap = Singleton.Manager<ManTechMaterialSwap>.inst;
+            List<ManTechMaterialSwap.MatReplacePairs> replacePairs = (List<ManTechMaterialSwap.MatReplacePairs>)m_MaterialPairsInstances.GetValue(manTechMaterialSwap);
+            Dictionary<int, float> minEmissiveMap = (Dictionary<int, float>)m_MinEmissiveForCorp.GetValue(manTechMaterialSwap);
+            foreach (KeyValuePair<int, List<ModdedSkinDefinition>> keyValuePair in corps)
+            {
+                int corpID = keyValuePair.Key;
+                List<ModdedSkinDefinition> moddedSkins = keyValuePair.Value;
+                int count = moddedSkins.Count;
+                if (!minEmissiveMap.ContainsKey(corpID))
+                {
+                    minEmissiveMap.Add(corpID, 0f);
+                }
+                if (count != 0)
+                {
+                    Material material = new Material(replacePairs[0].m_Materials[0]);
+                    material.name = Singleton.Manager<ManMods>.inst.FindCorpShortName((FactionSubTypes)corpID);
+                    ModdedSkinDefinition moddedSkinDefinition = moddedSkins[0];
+
+                    List<SkinTextures> corpSkinTextureInfos = new List<SkinTextures>(count);
+                    for (int i = 0; i < count; i++)
+                    {
+                        corpSkinTextureInfos.Add(new SkinTextures
+                        {
+                            m_Albedo = moddedSkins[i].m_Albedo,
+                            m_Emissive = moddedSkins[i].m_Emissive,
+                            m_Metal = moddedSkins[i].m_Combined
+                        });
+                    }
+
+                    SetupMaterial(corpID, material, moddedSkinDefinition.m_Albedo, moddedSkinDefinition.m_Combined, moddedSkinDefinition.m_Emissive, corpSkinTextureInfos, count);
+                }
+                yield return null;
+            }
+            yield break;
+        }
+
+        private void SetupMaterial(int corpID, Material material, Texture2D albedoTex, Texture2D metalTex, Texture2D emissiveTex, List<SkinTextures> corpSkinTextureInfos, int count)
+        {
+            ManTechMaterialSwap manTechMaterialSwap = Singleton.Manager<ManTechMaterialSwap>.inst;
+            Texture2D albedo = (Texture2D)MakeCorpArrayTexture.Invoke(manTechMaterialSwap, new object[] { albedoTex, count, TextureFormat.RGB24 });
+            Texture2D metal = (Texture2D)MakeCorpArrayTexture.Invoke(manTechMaterialSwap, new object[] { metalTex, count, TextureFormat.RGBA32 });
+            Texture2D emissive = (Texture2D)MakeCorpArrayTexture.Invoke(manTechMaterialSwap, new object[] { emissiveTex, count, TextureFormat.RGB24 });
+            CopyCorpArraySkinTextures.Invoke(manTechMaterialSwap, new object[] { albedo, metal, emissive, corpSkinTextureInfos });
+            material.SetTexture("_MainTex", albedo);
+            material.SetTexture("_MetallicGlossMap", metal);
+            material.SetTexture("_EmissionMap", emissive);
+            material.SetFloat("_RcpNumSkinsU", 1f / (float)(count / 8 + 1));
+            material.SetFloat("_RcpNumSkinsV", 1f / (float)Math.Min(count, 8));
+
+            IList groupTexArray = (IList)m_GroupTextureArray.GetValue(manTechMaterialSwap);
+            var groupTex = GroupTextureConstructor.Invoke(new object[] { albedo, metal, emissive });
+            groupTexArray.Add(groupTex);
+            manTechMaterialSwap.m_FinalCorpMaterials.Add(corpID, material);
+        }
+
         private IEnumerator SetupModdedCorpSkins()
         {
-            Singleton.Manager<ManTechMaterialSwap>.inst.RebuildCorpArrayTextures();
-            Dictionary<int, List<ModdedSkinDefinition>> dictionary = new Dictionary<int, List<ModdedSkinDefinition>>();
+            // Singleton.Manager<ManTechMaterialSwap>.inst.RebuildCorpArrayTextures();
+            IEnumerator iterator = RebuildCorpArrayTextures();
+            while (iterator.MoveNext())
+            {
+                yield return null;
+            }
+            Dictionary<int, List<ModdedSkinDefinition>> corpSkins = new Dictionary<int, List<ModdedSkinDefinition>>();
             foreach (KeyValuePair<int, string> keyValuePair in requestedSession.CorpIDs)
             {
                 ModdedCorpDefinition moddedCorpDefinition = manMods.FindModdedAsset<ModdedCorpDefinition>(keyValuePair.Value);
@@ -860,10 +977,16 @@ namespace ModManager
                             }
                         }
                     }
-                    dictionary.Add(keyValuePair.Key, moddedSkins);
+                    corpSkins.Add(keyValuePair.Key, moddedSkins);
                 }
+                yield return null;
             }
-            Singleton.Manager<ManTechMaterialSwap>.inst.BuildCustomCorpArrayTextures(dictionary);
+            Singleton.Manager<ManTechMaterialSwap>.inst.BuildCustomCorpArrayTextures(corpSkins);
+            /* IEnumerator finaliterator = BuildCustomCorpArrayTextures(corpSkins);
+            while (finaliterator.MoveNext())
+            {
+                yield return null;
+            } */
             yield break;
         }
     }
