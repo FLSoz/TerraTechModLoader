@@ -138,7 +138,9 @@ namespace ModManager.patches
             public static bool Prefix()
             {
                 ModManager.logger.Info("InitModScripts Hook called");
+                throw new Exception("InitModScripts WAS CALLED");
 
+                /*
                 // If we didn't load with the proper parameters, forcibly reprocess everything
                 // We don't expect this to be called at all
                 if (!ModManager.LoadedWithProperParameters)
@@ -159,6 +161,7 @@ namespace ModManager.patches
                 ModManager.ProcessEarlyInits();
                 ModManager.ProcessInits();
                 ModManager.logger.Info("InitModScripts End");
+                */
                 return false;
             }
         }
@@ -191,30 +194,15 @@ namespace ModManager.patches
                 ModManager.logger.Error("Called AutoAddModsToSession for null session");
             }
 
-            internal enum ModLoadStage
-            {
-                NotLoaded,
-                ReprocessMods,
-                EarlyInit,
-                Init,
-                Corps,
-                Skins,
-                Blocks,
-                Done
-            }
-
-            internal static ModLoadStage CurrentStage = ModLoadStage.NotLoaded;
-            internal static IEnumerator CurrentProcess = null;
-
             [HarmonyPrefix]
             internal static bool Prefix(ref ManMods __instance)
             {
                 ReflectedManMods.CheckReparseAllJsons.Invoke(__instance, null);
                 ModSessionInfo requestedSession = (ModSessionInfo)ReflectedManMods.m_RequestedSession.GetValue(__instance);
                 ModSessionInfo currentSession = (ModSessionInfo)ReflectedManMods.m_CurrentSession.GetValue(__instance);
-                if (requestedSession != null && requestedSession != currentSession)
+                bool loadingRequestedSessionInProgress = (bool)ReflectedManMods.m_LoadingRequestedSessionInProgress.GetValue(__instance);
+                if (requestedSession != null && (loadingRequestedSessionInProgress || requestedSession != currentSession))
                 {
-                    bool loadingRequestedSessionInProgress = (bool)ReflectedManMods.m_LoadingRequestedSessionInProgress.GetValue(__instance);
                     if (!loadingRequestedSessionInProgress)
                     {
                         if (
@@ -237,252 +225,31 @@ namespace ModManager.patches
                                 // Either we're switching to or from multiplayer, or the current session is not loaded
                                 ModManager.logger.Info("Determining mod session");
                                 AutoAddModsToSession(__instance, requestedSession);
-                                CurrentStage = ModLoadStage.NotLoaded;
-                                CurrentProcess = null;
                                 ReflectedManMods.m_LoadingRequestedSessionInProgress.SetValue(__instance, true);
                                 ModManager.CurrentSessionLoaded = false;
+                                ModManager.CurrentOperation = "Purging";
+                                ModManager.contentLoader.Start(currentSession, requestedSession);
                             }
                         }
                         else
                         {
-                            CurrentStage = ModLoadStage.NotLoaded;
-                            CurrentProcess = null;
                             ReflectedManMods.m_LoadingRequestedSessionInProgress.SetValue(__instance, true);
                             ModManager.logger.Info("Switching mod session");
                             ModManager.CurrentSessionLoaded = false;
+                            ModManager.CurrentOperation = "Purging";
+                            ModManager.contentLoader.Start(currentSession, requestedSession);
                         }
                     }
                     loadingRequestedSessionInProgress = (bool)ReflectedManMods.m_LoadingRequestedSessionInProgress.GetValue(__instance);
                     if (loadingRequestedSessionInProgress && !__instance.HasPendingLoads())
                     {
-                        switch (CurrentStage)
+                        ModdedContentLoader loader = ModManager.contentLoader;
+                        if (loader.InjectModdedContent())
                         {
-                            case ModLoadStage.NotLoaded:
-                                {
-                                    if (requestedSession.m_Authoritative)
-                                    {
-                                        Dictionary<string, string> corpModLookup = new Dictionary<string, string>();
-                                        Dictionary<string, List<string>> corpSkinLookup = new Dictionary<string, List<string>>();
-                                        List<string> moddedBlocks = new List<string>();
-                                        foreach (KeyValuePair<string, ModContainer> pair in (Dictionary<string, ModContainer>)ReflectedManMods.m_Mods.GetValue(__instance))
-                                        {
-                                            string modID = pair.Key;
-                                            if (!pair.Value.IsRemote && requestedSession.Mods.ContainsKey(modID))
-                                            {
-                                                foreach (ModdedCorpDefinition moddedCorpDefinition in pair.Value.Contents.m_Corps)
-                                                {
-                                                    if (!corpModLookup.ContainsKey(moddedCorpDefinition.name))
-                                                    {
-                                                        ModManager.logger.Debug("Found corp {corp} ({short}) in mod {mod}", moddedCorpDefinition.name, moddedCorpDefinition.m_ShortName, modID);
-                                                        corpModLookup.Add(moddedCorpDefinition.name, modID);
-                                                    }
-                                                    else
-                                                    {
-                                                        ModManager.logger.Warn(
-                                                            "Failed to add duplicate corp {corp} from mod {key} because we already have one from mod {mod}",
-                                                            moddedCorpDefinition.name,
-                                                            modID,
-                                                            corpModLookup[moddedCorpDefinition.name]
-                                                        );
-                                                    }
-                                                }
-                                                foreach (ModdedSkinDefinition moddedSkinDefinition in pair.Value.Contents.m_Skins)
-                                                {
-                                                    if (!corpSkinLookup.ContainsKey(moddedSkinDefinition.m_Corporation))
-                                                    {
-                                                        corpSkinLookup[moddedSkinDefinition.m_Corporation] = new List<string>();
-                                                    }
-                                                    ModManager.logger.Debug("Found skin {skin} for corp {corp}", moddedSkinDefinition.name, moddedSkinDefinition.m_Corporation);
-                                                    corpSkinLookup[moddedSkinDefinition.m_Corporation].Add(ModUtils.CreateCompoundId(modID, moddedSkinDefinition.name));
-                                                }
-                                                foreach (ModdedBlockDefinition moddedBlockDefinition in pair.Value.Contents.m_Blocks)
-                                                {
-                                                    ModManager.logger.Trace("Found modded block {block} in mod {mod}", moddedBlockDefinition.name, modID);
-                                                    moddedBlocks.Add(ModUtils.CreateCompoundId(modID, moddedBlockDefinition.name));
-                                                }
-                                            }
-                                        }
-                                        List<string> moddedCorps = new List<string>(corpModLookup.Count);
-                                        foreach (KeyValuePair<string, string> keyValuePair2 in corpModLookup)
-                                        {
-                                            moddedCorps.Add(ModUtils.CreateCompoundId(keyValuePair2.Value, keyValuePair2.Key));
-                                        }
-                                        ReflectedManMods.AutoAssignSessionIDs.Invoke(__instance, new object[] { requestedSession, moddedCorps, corpSkinLookup, moddedBlocks });
-                                    }
-                                    ModManager.logger.Debug("Purging modded content");
-                                    ReflectedManMods.PurgeModdedContentFromGame.Invoke(__instance, new object[] { currentSession });
-                                    if ((bool)ReflectedManMods.m_ReloadAllPending.GetValue(__instance))
-                                    {
-                                        ModManager.logger.Debug("Purged content, but reload pending. Moving to reload step.");
-                                        ReflectedManMods.m_CurrentSession.SetValue(__instance, null);
-                                        ReflectedManMods.CheckReloadAllMods.Invoke(__instance, null);
-                                        return false;
-                                    }
-                                    ModManager.logger.Debug("Purged content, injecting new content.");
-                                    CurrentStage = ModLoadStage.ReprocessMods;
-                                    break;
-                                }
-                            case ModLoadStage.ReprocessMods:
-                                {
-                                    if (CurrentProcess == null)
-                                    {
-                                        CurrentProcess = ModManager.ReprocessOfficialMods(requestedSession);
-                                    }
-                                    if (!CurrentProcess.MoveNext())
-                                    {
-                                        ModManager.logger.Info("All mods reprocessed. Determining dependencies");
-                                        ModManager.ReprocessModOrders(requestedSession);
-
-                                        ModManager.PatchCustomBlocksIfNeeded();
-                                        CurrentProcess = null;
-                                        CurrentStage = ModLoadStage.EarlyInit;
-                                    }
-                                    break;
-                                }
-                            case ModLoadStage.EarlyInit:
-                                {
-                                    if (CurrentProcess == null)
-                                    {
-                                        CurrentProcess = ModManager.ProcessEarlyInits();
-                                    }
-                                    if (!CurrentProcess.MoveNext())
-                                    {
-                                        object[] args = new object[] { null };
-                                        bool needsRestart = (bool)ReflectedManMods.SessionRequiresRestart.Invoke(__instance, args);
-                                        List<string> failedMods = (List<string>)args[0];
-
-                                        if (!needsRestart)
-                                        {
-                                            // We succeeded, go to init step
-                                            CurrentProcess = null;
-                                            CurrentStage = ModLoadStage.Init;
-                                            break;
-                                        }
-                                        else if (Singleton.Manager<ManNetworkLobby>.inst.LobbySystem.CurrentLobby != null)
-                                        {
-                                            // We failed, and is MP, restart game
-                                            UIScreenNotifications uiscreenNotifications = (UIScreenNotifications)Singleton.Manager<ManUI>.inst.GetScreen(ManUI.ScreenType.NotificationScreen);
-                                            string notification = string.Format(Singleton.Manager<Localisation>.inst.GetLocalisedString(LocalisationEnums.StringBanks.SteamWorkshop, 45, Array.Empty<Localisation.GlyphInfo>()), Array.Empty<object>());
-                                            uiscreenNotifications.Set(notification, delegate ()
-                                            {
-                                                Singleton.Manager<ManUI>.inst.RemovePopup();
-                                                ReflectedManMods.RequestRestartGame.Invoke(Singleton.Manager<ManMods>.inst, new object[] { requestedSession, Singleton.Manager<ManNetworkLobby>.inst.LobbySystem.CurrentLobby.ID });
-                                            }, delegate ()
-                                            {
-                                                Singleton.Manager<ManUI>.inst.RemovePopup();
-                                                Singleton.Manager<ManGameMode>.inst.TriggerSwitch<ModeAttract>();
-                                            }, Singleton.Manager<Localisation>.inst.GetLocalisedString(LocalisationEnums.StringBanks.MenuMain, 29, Array.Empty<Localisation.GlyphInfo>()), Singleton.Manager<Localisation>.inst.GetLocalisedString(LocalisationEnums.StringBanks.MenuMain, 30, Array.Empty<Localisation.GlyphInfo>()));
-                                            uiscreenNotifications.SetUseNewInputHandler(true);
-                                            Singleton.Manager<ManUI>.inst.PushScreenAsPopup(uiscreenNotifications, ManUI.PauseType.None);
-                                            break;
-                                        }
-
-                                        // We failed, but go to init step anyway
-                                        string message = String.Join("\n", failedMods.Select((mod) => { return $" - {mod}"; }));
-                                        ModManager.logger.Error($"Some mods failed to EarlyInit for singleplayer game?\n{message}");
-                                        CurrentProcess = null;
-                                        CurrentStage = ModLoadStage.Init;
-                                        break;
-                                    }
-                                    break;
-                                }
-                            case ModLoadStage.Init:
-                                {
-                                    if (CurrentProcess == null)
-                                    {
-                                        CurrentProcess = ModManager.ProcessInits();
-                                    }
-                                    if (!CurrentProcess.MoveNext())
-                                    {
-                                        CurrentProcess = null;
-                                        CurrentStage = ModLoadStage.Corps;
-                                    }
-                                    break;
-                                }
-                            case ModLoadStage.Corps:
-                                {
-                                    if (CurrentProcess == null)
-                                    {
-                                        CurrentProcess = ModManager.InjectModdedCorps(__instance, requestedSession);
-                                    }
-                                    if (!CurrentProcess.MoveNext())
-                                    {
-                                        CurrentProcess = null;
-                                        CurrentStage = ModLoadStage.Skins;
-                                    }
-                                    break;
-                                }
-                            case ModLoadStage.Skins:
-                                {
-                                    if (CurrentProcess == null)
-                                    {
-                                        CurrentProcess = ModManager.InjectModdedSkins(__instance, requestedSession);
-                                    }
-                                    if (!CurrentProcess.MoveNext())
-                                    {
-                                        // Perform corp/skin setup now that everything is loaded
-                                        Singleton.Manager<ManTechMaterialSwap>.inst.RebuildCorpArrayTextures();
-                                        Dictionary<int, List<ModdedSkinDefinition>> dictionary = new Dictionary<int, List<ModdedSkinDefinition>>();
-                                        foreach (KeyValuePair<int, string> keyValuePair in requestedSession.CorpIDs)
-                                        {
-                                            ModdedCorpDefinition moddedCorpDefinition = __instance.FindModdedAsset<ModdedCorpDefinition>(keyValuePair.Value);
-                                            if (moddedCorpDefinition != null)
-                                            {
-                                                List<ModdedSkinDefinition> list2 = new List<ModdedSkinDefinition>();
-                                                list2.Add(moddedCorpDefinition.m_DefaultSkinSlots[0]);
-                                                Dictionary<int, string> dictionary2;
-                                                if (requestedSession.SkinIDsByCorp.TryGetValue(keyValuePair.Key, out dictionary2))
-                                                {
-                                                    foreach (KeyValuePair<int, string> keyValuePair2 in dictionary2)
-                                                    {
-                                                        ModdedSkinDefinition moddedSkinDefinition = __instance.FindModdedAsset<ModdedSkinDefinition>(keyValuePair2.Value);
-                                                        if (moddedSkinDefinition != null)
-                                                        {
-                                                            list2.Add(moddedSkinDefinition);
-                                                        }
-                                                    }
-                                                }
-                                                dictionary.Add(keyValuePair.Key, list2);
-                                            }
-                                        }
-                                        Singleton.Manager<ManTechMaterialSwap>.inst.BuildCustomCorpArrayTextures(dictionary);
-
-                                        // Move to next stage
-                                        CurrentProcess = null;
-                                        CurrentStage = ModLoadStage.Blocks;
-                                    }
-                                    break;
-                                }
-                            case ModLoadStage.Blocks:
-                                {
-                                    if (CurrentProcess == null)
-                                    {
-                                        CurrentProcess = ModManager.InjectModdedBlocks(__instance, requestedSession, currentSession);
-                                    }
-                                    if (!CurrentProcess.MoveNext())
-                                    {
-                                        Singleton.Manager<ManSpawn>.inst.OnDLCLoadComplete();
-
-                                        // Move to next stage
-                                        CurrentProcess = null;
-                                        CurrentStage = ModLoadStage.Done;
-                                    }
-                                    break;
-                                }
-                            case ModLoadStage.Done:
-                                {
-                                    ReflectedManMods.m_CurrentSession.SetValue(__instance, requestedSession);
-                                    ReflectedManMods.m_RequestedSession.SetValue(__instance, null);
-                                    ReflectedManMods.m_LoadingRequestedSessionInProgress.SetValue(__instance, false);
-                                    ModManager.CurrentSessionLoaded = true;
-                                    break;
-                                }
-                            default:
-                                {
-                                    CurrentProcess = null;
-                                    ModManager.logger.Error("MOD LOADING IN UNKNOWN STATE: {state}", CurrentStage.ToString());
-                                    break;
-                                }
+                            ReflectedManMods.m_RequestedSession.SetValue(__instance, null);
+                            ReflectedManMods.m_LoadingRequestedSessionInProgress.SetValue(__instance, false);
+                            ModManager.CurrentSessionLoaded = true;
+                            loader.Finish();
                         }
                     }
                 }
@@ -505,12 +272,17 @@ namespace ModManager.patches
             [HarmonyPrefix]
             public static bool Prefix(UILoadingScreenModProgress __instance)
             {
-                if (ModManager.CurrentOperation != null)
+                if (!ModManager.CurrentSessionLoaded)
                 {
                     __instance.loadingBar.SetActive(true);
-                    __instance.loadingProgressText.text = $"{ModManager.CurrentOperation} - {(int)(100 * ModManager.CurrentOperationProgress)}%\n{ModManager.CurrentOperationSpecifics}";
-                    __instance.loadingProgressImage.fillAmount = ModManager.CurrentOperationProgress;
-                    return false;
+                    ModManager.OperationDetails details = ModManager.GetCurrentOperation();
+                    if (details.Name != null)
+                    {
+                        __instance.loadingProgressText.text = $"{details.Name} - {(int)(100 * details.Progress)}%\n{details.Specifics}";
+                        __instance.loadingProgressImage.fillAmount = details.Progress;
+                        return false;
+                    }
+                    return true;
                 }
                 return true;
             }

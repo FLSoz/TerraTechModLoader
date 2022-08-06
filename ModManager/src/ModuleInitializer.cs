@@ -13,7 +13,7 @@ namespace ModManager
         {
             if (!Inited)
             {
-                Console.WriteLine($"[0ModManager] Initializing mod manager version v.{Assembly.GetExecutingAssembly().GetName().Version} ...");
+                Console.WriteLine($"[0ModManager] Initializing mod manager version v.{ModManager.Version} ...");
 
                 // Configure all loggers
                 ModManager.ConfigureLogger();
@@ -21,6 +21,7 @@ namespace ModManager
                 DependencyGraph<QMod>.ConfigureLogger();
                 DependencyGraph<Type>.ConfigureLogger();
 
+                ModManager.Setup();
                 ModManager.PatchAssemblyLoading();
                 // TODO: Add assembly initialization logic.
                 ModManager.Patch();

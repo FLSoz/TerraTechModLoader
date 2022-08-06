@@ -23,6 +23,7 @@ namespace LogManager
     // Target config - defines a target file for logging
     public struct TargetConfig : IEquatable<TargetConfig>
     {
+        // filename excludes extension. e.g. filename of TEST will output TEST.log
         public string filename;
         public string path;
         public string layout;
@@ -72,7 +73,8 @@ namespace LogManager
         internal static string GetFilePath(string path, string filename)
         {
             string adjPath = path == null ? "" : path;
-            return Path.Combine(adjPath, filename);
+            string adjFilename = filename == null ? "" : filename;
+            return Path.Combine(adjPath, adjFilename);
         }
 
         internal static string GetRelativePath(string logPath, string basePath)
@@ -95,12 +97,14 @@ namespace LogManager
 
         public static LogTarget RegisterLoggingTarget(TargetConfig targetConfig)
         {
-            string targetPath = GetFilePath(targetConfig.path, targetConfig.filename);
+            // Preliminary cache check
+            string targetPath = Path.ChangeExtension(GetFilePath(targetConfig.path, targetConfig.filename), ".log").Trim(Path.DirectorySeparatorChar);
             if (!TargetPathDictionary.TryGetValue(targetPath, out LogTarget target))
             {
                 string shortTargetName = targetConfig.filename;
                 Console.WriteLine($"[LogManager] Registering logger {shortTargetName}");
 
+                // Calculate full path
                 string fullPath = targetConfig.path;
                 if (fullPath is null || fullPath.Length == 0)
                 {
@@ -122,27 +126,36 @@ namespace LogManager
                 {
                     fullPath = Path.Combine(LogsDir, fullPath);
                 }
+                targetPath = fullPath.Substring(fullPath.IndexOf(LogsDir) + LogsDir.Length).Trim(Path.DirectorySeparatorChar);
 
-                target = new LogTarget
+                // Seconday cache check
+                if (!TargetPathDictionary.TryGetValue(targetPath, out target))
                 {
-                    logFile = new FileTarget($"logfile-{targetConfig.path}")
+                    target = new LogTarget
                     {
-                        FileName = fullPath,
-                        Layout = targetConfig.layout is null || targetConfig.layout.Length == 0 ?
+                        logFile = new FileTarget($"logfile-{targetConfig.path}")
+                        {
+                            FileName = fullPath,
+                            Layout = targetConfig.layout is null || targetConfig.layout.Length == 0 ?
                         "${longdate} | ${level:uppercase=true:padding=-5:alignmentOnTruncation=left} | ${logger:shortName=true} | ${message}  ${exception}" :
                         targetConfig.layout,
-                        EnableFileDelete = false,
-                        DeleteOldFileOnStartup = false
-                    },
-                    config = new TargetConfig
-                    {
-                        path = fullPath,
-                        layout = targetConfig.layout,
-                        keepOldFiles = targetConfig.keepOldFiles
-                    }
-                };
+                            EnableFileDelete = false,
+                            DeleteOldFileOnStartup = false
+                        },
+                        config = new TargetConfig
+                        {
+                            path = fullPath,
+                            layout = targetConfig.layout,
+                            keepOldFiles = targetConfig.keepOldFiles
+                        }
+                    };
 
-                TargetPathDictionary.Add(targetPath, target);
+                    TargetPathDictionary.Add(targetPath, target);
+                }
+                else
+                {
+                    Console.WriteLine($"[LogManager] Already registered logger with path {targetPath}");
+                }
             }
             else
             {

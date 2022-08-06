@@ -19,7 +19,7 @@ namespace ModManager
 			string modPath = Path.Combine(ModManager.TTSteamDir, ManMods.LocalModsDirectory, localModName);
 			if (Directory.Exists(modPath))
 			{
-				ModManager.logger.Info("Found mod in {ModFolder}. Resolved name as {ModName}", modPath, localModName);
+				ModManager.logger.Info("  Found mod in {ModFolder}. Resolved name as {ModName}", modPath, localModName);
 				ModContainer modContainer = new ModContainer(localModName, string.Concat(new string[]
 				{
 					modPath,
@@ -33,7 +33,7 @@ namespace ModManager
 					{
 						mods.Add(modContainer.ModID, modContainer);
 						ReflectedManMods.RequestModLoad.Invoke(manager, new object[] { modContainer.ModID });
-						ModManager.logger.Info("Loading local mod {ModID}", modContainer.ModID);
+						ModManager.logger.Info("  Loading local mod {ModID}", modContainer.ModID);
 					}
 					else
 					{

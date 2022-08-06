@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -36,20 +37,43 @@ namespace ModManager
 
         private MethodInfo _ManagedEarlyInit;
 
+        private MethodInfo _ManagedIteratorEarlyInit;
+        private MethodInfo _ManagedIteratorInit;
+        private MethodInfo _ManagedIteratorDeInit;
+
         public String Name
         {
             get => this.instanceType.Name;
         }
 
+        private static MethodInfo FirstOrNull(IEnumerable<MethodInfo> collection, Func<MethodInfo, bool> func)
+        {
+            try
+            {
+                return collection.First(func);
+            }
+            catch (System.InvalidOperationException)
+            {
+                return null;
+            }
+        }
+
         public static ManagedMod FromMod(Type mod)
         {
             ModManager.logger.Trace($"Setting up ManagedMod for type {mod}");
+            MethodInfo _ManagedEarlyInit = AccessTools.Method(mod, "ManagedEarlyInit");
+
+            MethodInfo[] allMethods = mod.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+
+            MethodInfo _ManagedIteratorEarlyInit = FirstOrNull(allMethods, m => m.Name == "EarlyInitIterator" && m.ReturnType == typeof(IEnumerator<float>));
+            MethodInfo _ManagedIteratorInit = FirstOrNull(allMethods, m => m.Name == "InitIterator" && m.ReturnType == typeof(IEnumerator<float>));
+            MethodInfo _ManagedIteratorDeInit = FirstOrNull(allMethods, m => m.Name == "DeInitIterator" && m.ReturnType == typeof(IEnumerator<float>));
+
             FieldInfo _LoadOrder = AccessTools.Field(mod, "LoadOrder");
             FieldInfo _InitOrder = AccessTools.Field(mod, "InitOrder");
 
             MethodInfo _GetLoadAfter = AccessTools.Method(mod, "LoadAfter");
             MethodInfo _GetLoadBefore = AccessTools.Method(mod, "LoadBefore");
-            MethodInfo _ManagedEarlyInit = AccessTools.Method(mod, "ManagedEarlyInit");
 
             MethodInfo _Update = AccessTools.Method(mod, "Update");
             MethodInfo _FixedUpdate = AccessTools.Method(mod, "FixedUpdate");
@@ -120,8 +144,9 @@ namespace ModManager
             }
 
             // Check if we want to allow dependency management on the EarlyInit
-            if (_ManagedEarlyInit != null)
+            if (_ManagedEarlyInit != null || _ManagedIteratorEarlyInit != null)
             {
+                managedMod._ManagedIteratorEarlyInit = _ManagedIteratorEarlyInit;
                 managedMod._ManagedEarlyInit = _ManagedEarlyInit;
                 managedMod._GetEarlyLoadAfter = AccessTools.Method(mod, "EarlyLoadAfter");
                 managedMod._GetEarlyLoadBefore = AccessTools.Method(mod, "EarlyLoadBefore");
@@ -140,6 +165,9 @@ namespace ModManager
                     managedMod._EarlyInitOrder = ModManager.DEFAULT_LOAD_ORDER;
                 }
             }
+
+            managedMod._ManagedIteratorInit = _ManagedIteratorInit;
+            managedMod._ManagedIteratorDeInit = _ManagedIteratorDeInit;
             return managedMod;
         }
 
@@ -259,26 +287,70 @@ namespace ModManager
             get => this._HasFixedUpdate;
         }
 
-        public void DeInit()
+        public IEnumerator<float> DeInit()
         {
-            this.Instance.DeInit();
+            if (this._ManagedIteratorDeInit != null)
+            {
+                ModManager.logger.Trace($"Iterator DeInit of {this.instanceType.FullName}");
+                IEnumerator<float> iterator = (IEnumerator<float>)this._ManagedIteratorDeInit.Invoke(this.Instance, null);
+                while (iterator.MoveNext())
+                {
+                    yield return iterator.Current;
+                }
+            }
+            else
+            {
+                ModManager.logger.Trace($"Standard DeInit of {this.instanceType.FullName}");
+                this.Instance.DeInit();
+            }
+            yield break;
         }
 
-        public void EarlyInit()
+        public IEnumerator<float> EarlyInit()
         {
-            if (this._ManagedEarlyInit != null)
+            if (this._ManagedIteratorEarlyInit != null)
             {
+                ModManager.logger.Trace($"Iterator EarlyInit of {this.instanceType.FullName}");
+                IEnumerator<float> iterator = (IEnumerator<float>) this._ManagedIteratorEarlyInit.Invoke(this.Instance, null);
+                while (iterator.MoveNext())
+                {
+                    yield return iterator.Current;
+                }
+            }
+            else if (this._ManagedEarlyInit != null)
+            {
+                ModManager.logger.Trace($"Managed EarlyInit of {this.instanceType.FullName}");
                 this._ManagedEarlyInit.Invoke(this.Instance, null);
             }
             else if (this.Instance.HasEarlyInit())
             {
+                ModManager.logger.Trace($"Standard EarlyInit of {this.instanceType.FullName}");
                 this.Instance.EarlyInit();
             }
+            else
+            {
+                ModManager.logger.Trace($"NO EarlyInit of {this.instanceType.FullName}");
+            }
+            yield break;
         }
 
-        public void Init()
+        public IEnumerator<float> Init()
         {
-            this.Instance.Init();
+            if (this._ManagedIteratorInit != null)
+            {
+                ModManager.logger.Trace($"Iterator Init of {this.instanceType.FullName}");
+                IEnumerator<float> iterator = (IEnumerator<float>)this._ManagedIteratorInit.Invoke(this.Instance, null);
+                while (iterator.MoveNext())
+                {
+                    yield return iterator.Current;
+                }
+            }
+            else
+            {
+                ModManager.logger.Trace($"Standard Init of {this.instanceType.FullName}");
+                this.Instance.Init();
+            }
+            yield break;
         }
 
         public void Update()

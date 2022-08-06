@@ -1,12 +1,114 @@
 ﻿using System.Collections.Generic;
 using HarmonyLib;
 using UnityEngine;
+using UnityEngine.UI;
 using Payload.UI.Commands.Steam;
 
 namespace ModManager.patches
 {
     public static class ModLoadingPatches
     {
+
+        [HarmonyPatch(typeof(UILoadingScreenModProgress), "Update")]
+        private static class UpdateLoadingScreen
+        {
+            private static bool dumped = false;
+
+            // Texture2D texture, Rect rect, Vector2 pivot, float pixelsPerUnit, uint extrude, SpriteMeshType meshType, Vector4 border
+            private static Sprite CloneSprite(Sprite sprite, Texture2D newTex)
+            {
+                Sprite newSprite = Sprite.Create(newTex, sprite.rect, sprite.pivot, sprite.pixelsPerUnit, 10, SpriteMeshType.Tight, sprite.border);
+                return newSprite;
+            }
+
+            private static Vector2[] GetCorrectedSpriteVertices(Sprite sprite)
+            {
+                Vector2[] spriteVertices = sprite.vertices;
+                for (int i = 0; i < spriteVertices.Length; i++)
+                {
+                    spriteVertices[i].x = Mathf.Clamp(
+                        (sprite.vertices[i].x - sprite.bounds.center.x -
+                            (sprite.textureRectOffset.x / sprite.texture.width) + sprite.bounds.extents.x) /
+                        (2.0f * sprite.bounds.extents.x) * sprite.rect.width,
+                        0.0f, sprite.rect.width);
+
+                    spriteVertices[i].y = Mathf.Clamp(
+                        (sprite.vertices[i].y - sprite.bounds.center.y -
+                            (sprite.textureRectOffset.y / sprite.texture.height) + sprite.bounds.extents.y) /
+                        (2.0f * sprite.bounds.extents.y) * sprite.rect.height,
+                        0.0f, sprite.rect.height);
+                }
+                return spriteVertices;
+            }
+
+            [HarmonyPrefix]
+            public static void Prefix(UILoadingScreenModProgress __instance)
+            {
+                if (!dumped)
+                {
+
+                    ModContainer container = ModManager.ModManagerContainer;
+                    ModManager.logger.Debug("Got ModContainer");
+                    ModContents contents = container.Contents;
+                    ModManager.logger.Debug("Got ModContents");
+
+                    if (contents != null)
+                    {
+                        dumped = true;
+                        Transform Background = __instance.loadingBar.transform.GetChild(1);
+                        Transform Fill = Background.GetChild(0);
+                        Image background = Background.GetComponent<Image>();
+                        Image fill = Fill.GetComponent<Image>();
+                        ModManager.logger.Debug("Got target images");
+                        Texture2D fillTex = contents.FindAsset("fill") as Texture2D;
+                        Texture2D backgroundTex = contents.FindAsset("background") as Texture2D;
+                        ModManager.logger.Debug("Got Replacement Textures");
+
+                        Sprite newFill = CloneSprite(fill.sprite, fillTex);
+                        Sprite newBackground = CloneSprite(background.sprite, backgroundTex);
+
+                        // Override background geometry
+                        Vector2[] backgroundVertices = new Vector2[] {
+                            new Vector2(2.99f, 0.22f),
+                            new Vector2(3.0f, -0.19f),
+                            new Vector2(3.0f, 0.19f),
+                            new Vector2(2.99f, -0.22f),
+                            new Vector2(2.97f, 0.25f),
+                            new Vector2(2.96f, -0.25f),
+                            new Vector2(-2.96f, 0.25f),
+                            new Vector2(-2.96f, -0.25f),
+                            new Vector2(-3.0f, 0.21f),
+                            new Vector2(-3.0f, -0.23f)
+                        };
+                        ushort[] backgroundTriangles = new ushort[] { 9, 8, 7, 6, 7, 8, 5, 7, 6, 4, 5, 6, 3, 5, 4, 0, 3, 4, 1, 3, 0, 2, 1, 0 };
+                        newBackground.OverrideGeometry(GetCorrectedSpriteVertices(background.sprite), background.sprite.triangles);
+
+                        Vector2[] fillVertices = new Vector2[] {
+                            new Vector2(-0.25f, 0.25f),
+                            new Vector2(0.25f, -0.25f),
+                            new Vector2(0.25f, 0.25f),
+                            new Vector2(-0.25f, -0.25f)
+                        };
+                        ushort[] fillTriangles = new ushort[] { 3, 0, 1, 2, 1, 0 };
+                        newFill.OverrideGeometry(GetCorrectedSpriteVertices(fill.sprite), fill.sprite.triangles);
+
+                        Sprite oldFill = fill.sprite;
+                        Sprite oldBackground = background.sprite;
+                        fill.sprite = newFill;
+                        background.sprite = newBackground;
+
+                        // fill.sprite = oldFill;
+                        // background.sprite = oldBackground;
+
+                        // fill.material.SetTexture("_MainTex", fillTex);
+                       //  background.material.SetTexture("_MainTex", backgroundTex);
+                        // background.color = new Color(0.3f, 0.0f, 1.0f);
+                        // fill.color = new Color(1.0f, 0.0f, 0.7f);
+                    }
+                }
+            }
+        }
+
         // Notes on mod loading process:
         // Mod ID is enforced unique string based on key inside ManMods.m_Mods
         // *Every* local mod is always processed, and while content may be removed, the ModContainer and key remain in m_Mods

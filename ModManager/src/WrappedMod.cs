@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -147,11 +148,16 @@ namespace ModManager
             get => this.container.IsRemote;
         }
 
-        public void EarlyInit()
+        public IEnumerator<float> EarlyInit()
         {
+            yield return 0.0f;
             if (this.managedMod != null)
             {
-                this.managedMod.EarlyInit();
+                IEnumerator<float> iterator = this.managedMod.EarlyInit();
+                while (iterator.MoveNext())
+                {
+                    yield return iterator.Current;
+                }
             }
             else
             {
@@ -165,32 +171,48 @@ namespace ModManager
                     ModManager.logger.Info("Mod {Mod} has no EarlyInit", Name);
                 }
             }
+            yield return 1.0f;
+            yield break;
         }
 
-        public void Init()
+        public IEnumerator<float> Init()
         {
+            yield return 0.0f;
             if (this.managedMod != null)
             {
                 ModManager.logger.Trace("Running Init for MANAGED Mod {Mod}", Name);
-                this.managedMod.Init();
+                IEnumerator<float> iterator = this.managedMod.Init();
+                while (iterator.MoveNext())
+                {
+                    yield return iterator.Current;
+                }
             }
             else
             {
                 ModManager.logger.Trace("Running Init for NON-MANAGED Mod {Mod}", Name);
                 this.officialMod.Init();
             }
+            yield return 1.0f;
+            yield break;
         }
 
-        public void DeInit()
+        public IEnumerator<float> DeInit()
         {
+            yield return 0.0f;
             if (this.managedMod != null)
             {
-                this.managedMod.DeInit();
+                IEnumerator<float> iterator = this.managedMod.DeInit();
+                while (iterator.MoveNext())
+                {
+                    yield return iterator.Current;
+                }
             }
             else
             {
                 this.officialMod.DeInit();
             }
+            yield return 1.0f;
+            yield break;
         }
 
         public void Update()

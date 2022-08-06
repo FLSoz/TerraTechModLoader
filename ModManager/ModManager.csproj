@@ -112,9 +112,11 @@
     <Compile Include="src\datastructures\BinaryHeap.cs" />
     <Compile Include="src\datastructures\DependencyGraph.cs" />
     <Compile Include="src\datastructures\PriorityQueue.cs" />
+    <Compile Include="src\Extensions.cs" />
     <Compile Include="src\IManagedMod.cs" />
     <Compile Include="src\LocalLoader.cs" />
     <Compile Include="src\ManagedMod.cs" />
+    <Compile Include="src\ModdedContentLoader.cs" />
     <Compile Include="src\ModManager.cs" />
     <Compile Include="src\ModuleInitializer.cs" />
     <Compile Include="src\patches\ModSessionPatches.cs" />

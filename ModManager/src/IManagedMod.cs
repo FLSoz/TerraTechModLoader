@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -85,11 +86,11 @@ namespace ModManager
             get;
         }
 
-        void DeInit();
+        IEnumerator<float> DeInit();
 
-        void Init();
+        IEnumerator<float> Init();
 
-        void EarlyInit();
+        IEnumerator<float> EarlyInit();
 
         void Update();
 
