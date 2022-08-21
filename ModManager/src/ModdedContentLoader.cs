@@ -543,7 +543,7 @@ namespace ModManager
             yield break;
         }
 
-        private static IEnumerator<float> InjectLegacyBlocks(
+        private static IEnumerator<float> InjectLegacyBlocksIterator(
             ModSessionInfo newSessionInfo,
             Dictionary<int, Dictionary<int, Dictionary<BlockTypes, ModdedBlockDefinition>>> gradeBlockPerCorp,
             Dictionary<int, Sprite> blockSpriteDict
@@ -746,7 +746,7 @@ namespace ModManager
                 }
                 logger.Info("Injected all official blocks");
 
-                IEnumerator<float> legacyIterator = InjectLegacyBlocks(this.requestedSession, gradeBlocksPerCorp, blockSpriteDict);
+                IEnumerator<float> legacyIterator = InjectLegacyBlocksIterator(this.requestedSession, gradeBlocksPerCorp, blockSpriteDict);
                 if (legacyIterator != null) {
                     ModManager.CurrentOperation = "Injecting legacy modded blocks";
                     logger.Info("Injecting Legacy Modded Blocks");

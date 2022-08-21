@@ -187,6 +187,10 @@ namespace ModManager
             {
                 ModManagerContainer = thisContainer;
             }
+            else if (mods.TryGetValue("0ModManager BETA", out thisContainer))
+            {
+                ModManagerContainer = thisContainer;
+            }
             else
             {
                 logger.Error("FAILED TO FETCH 0ModManager ModContainer");

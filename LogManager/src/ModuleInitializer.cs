@@ -44,9 +44,16 @@ namespace LogManager
                         else if (arg[10] == '_')
                         {
                             string loggerName = arg.Substring(11);
-                            LogLevel logLevel = LogLevel.FromString(argValue);
-                            TTLogManager.ConfiguredLogLevels.Add(loggerName, logLevel);
-                            Console.WriteLine($"Detected logging config of {logLevel} for logger {loggerName}");
+                            try
+                            {
+                                LogLevel logLevel = LogLevel.FromString(argValue);
+                                TTLogManager.ConfiguredLogLevels.Add(loggerName, logLevel);
+                                Console.WriteLine($"Detected logging config of {logLevel} for logger {loggerName}");
+                            }
+                            catch (Exception e)
+                            {
+                                Console.WriteLine($"FAILED to get log level for logger {loggerName}, {argValue} is invalid log level");
+                            }
                         }
                     }
                     else if (arg == "+default_logging")
