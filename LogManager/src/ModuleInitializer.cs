@@ -47,7 +47,7 @@ namespace LogManager
                             try
                             {
                                 LogLevel logLevel = LogLevel.FromString(argValue);
-                                TTLogManager.ConfiguredLogLevels.Add(loggerName, logLevel);
+                                TTLogManager.ConfiguredLogLevels[loggerName] = logLevel;
                                 Console.WriteLine($"Detected logging config of {logLevel} for logger {loggerName}");
                             }
                             catch (Exception e)

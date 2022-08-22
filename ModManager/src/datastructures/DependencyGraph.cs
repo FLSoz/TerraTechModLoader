@@ -164,7 +164,7 @@ namespace ModManager.Datastructures
 
         public void ResolveCycles(List<List<int>> cycles)
         {
-            logger.Info("Resolving cycles via Social Agony alg");
+            logger.Warn("Resolving cycles via Social Agony alg");
 
             // Roots are still guaranteed to be roots.
             // Going from roots downwards, we assign ranking
