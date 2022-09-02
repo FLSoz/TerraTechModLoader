@@ -18,16 +18,16 @@ namespace ModManager
         internal static NLog.Logger logger = NLog.LogManager.GetLogger("ModdedContentLoader");
         internal static ManMods manMods = Singleton.Manager<ManMods>.inst;
 
-        internal enum ModLoadStage
+        internal enum ModLoadStage : byte
         {
-            NotLoaded,
-            ReprocessMods,
-            EarlyInit,
-            Init,
-            Corps,
-            Skins,
-            Blocks,
-            Done
+            NotLoaded = 0,
+            ReprocessMods = 1,
+            EarlyInit = 2,
+            Init = 3,
+            Corps = 4,
+            Skins = 5,
+            Blocks = 6,
+            Done = 7
         }
 
         internal ModLoadStage CurrentStage = ModLoadStage.NotLoaded;
@@ -521,6 +521,7 @@ namespace ModManager
                         {
                             try
                             {
+                                logger.Trace($"Processing Loader {keyValuePair.Key}");
                                 if (!jsonmoduleLoader.CreateModuleForBlock(blockID, def, block, keyValuePair.Value))
                                 {
                                     logger.Error(string.Format("Failed to parse module {0} in JSON for {1}", keyValuePair.Key, def));

@@ -10,10 +10,10 @@ namespace LogManager
         private static bool Inited = false;
         public static void Run()
         {
-            Console.WriteLine($"[LogManager] Initializing logging manager version v.{VERSION}...");
-
             if (!Inited)
             {
+                Inited = true;
+                Console.WriteLine($"[LogManager] Initializing logging manager version v.{VERSION}...");
                 TTLogManager.config = new NLog.Config.LoggingConfiguration();
 
                 // Rules for mapping loggers to targets
@@ -70,7 +70,6 @@ namespace LogManager
                 {
                     Patches.Init();
                 }
-                Inited = true;
             }
         }
     }

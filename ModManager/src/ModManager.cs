@@ -41,6 +41,14 @@ namespace ModManager
         {
             ModuleInitializer.Run();
         }
+        public ModManager()
+        {
+            ModuleInitializer.Run();
+            if (StartedGameWithParameters)
+            {
+                ModManager.RequestConfiguredModSession();
+            }
+        }
 
         internal static bool EnableTTQMMHandling = false;
         private static bool patchedAssemblyLoading = false;
@@ -72,7 +80,7 @@ namespace ModManager
         {
             TargetConfig targetConfig = new TargetConfig
             {
-                layout = "${longdate} | ${level:uppercase=true:padding=-5:alignmentOnTruncation=left} | ${logger:shortName=true} | ${message}  ${exception}",
+                layout = "${longdate} ${level:uppercase=true:padding=-5:alignmentOnTruncation=left} ${logger:shortName=true} | ${message}  ${exception}",
                 filename = "ModManager",
                 keepOldFiles = false
             };

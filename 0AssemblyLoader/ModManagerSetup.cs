@@ -7,7 +7,19 @@ public class ModManagerSetup : ModBase
 {
     static ModManagerSetup()
     {
-        Run();
+        if (!Inited)
+        {
+            Inited = true;
+            Run();
+        }
+    }
+    public ModManagerSetup()
+    {
+        if (!Inited)
+        {
+            Inited = true;
+            Run();
+        }
     }
 
     public static string modManagerDir = Path.GetDirectoryName(
@@ -23,6 +35,7 @@ public class ModManagerSetup : ModBase
     public static Assembly NLog;
     public static Assembly NLogManager;
     public static Assembly ModManager;
+    private static bool Inited = false;
 
     public static void Run()
     {
@@ -49,15 +62,16 @@ public class ModManagerSetup : ModBase
             NLogManager.GetTypes();
             Console.WriteLine("[0AssemblyLoader] Force getting ModManager types");
             ModManager.GetTypes();
+
+            Console.WriteLine("[0AssemblyLoader] Force Setup NLogManager");
+            NLogManager.GetType("LogManager.ModuleInitializer", true).GetMethod("Run", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static).Invoke(null, null);
+            Console.WriteLine("[0AssemblyLoader] Force Setup 0ModManager");
+            ModManager.GetType("ModManager.ModuleInitializer", true).GetMethod("Run", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static).Invoke(null, null);
         }
-        catch (System.Reflection.ReflectionTypeLoadException ex)
+        catch (Exception exception)
         {
             Console.WriteLine("[0AssemblyLoader] FAILED to load types!");
-            Exception[] exceptions = ex.LoaderExceptions;
-            foreach (Exception exception in exceptions)
-            {
-                Console.WriteLine(exception);
-            }
+            Console.WriteLine(exception);
         }
         // Console.WriteLine("Loaded assemblies:\n" + String.Join("\n", assemblies.Select(x => x.FullName)));
         // UnpatchAssemblyLoading();
@@ -72,7 +86,7 @@ public class ModManagerSetup : ModBase
         FileInfo[] dlls = parentDirectory.GetFiles("*.dll", SearchOption.AllDirectories);
         foreach (FileInfo dll in dlls)
         {
-            if (args.Name.Contains(Path.GetFileNameWithoutExtension(dll.Name)))
+            if (args.Name == Path.GetFileName(dll.Name))
             {
                 return Assembly.LoadFile(dll.FullName);
             }

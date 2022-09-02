@@ -13,6 +13,7 @@ namespace ModManager
         {
             if (!Inited)
             {
+                Inited = true;
                 Console.WriteLine($"[0ModManager] Initializing mod manager version v.{ModManager.Version} ...");
 
                 // Configure all loggers
@@ -51,14 +52,11 @@ namespace ModManager
                     else if (commandLineArgs[i] == "+custom_mod_list")
                     {
                         ModManager.StartedGameWithParameters = true;
-                        ModManager.RequestConfiguredModSession();
                     }
                 }
 
                 // Patch snapshot load failure logging
                 SerializationLoggingPatches.Setup();
-
-                Inited = true;
             }
         }
     }
