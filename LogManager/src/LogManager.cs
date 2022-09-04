@@ -139,9 +139,9 @@ namespace LogManager
                     // Manually handle deletion ourselves, or the ModManager log will constantly get reset
                     if (!targetConfig.keepOldFiles)
                     {
-                        if (File.Exists(targetConfig.path))
+                        if (File.Exists(fullPath))
                         {
-                            File.Delete(targetConfig.path);
+                            File.Delete(fullPath);
                         }
                     }
 
