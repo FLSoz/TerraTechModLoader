@@ -45,6 +45,7 @@ namespace LogManager
                 };
 
                 LogTarget target = TTLogManager.RegisterLoggingTarget(loggerID, targetConfig);
+                TTLogManager.DebugPrint($"[LogManager]  Located logging target");
                 TTLogManager.RegisterLogger(logger, target, NLog.LogLevel.FromOrdinal(minLoggingLevel));
                 TTLogManager.InfoPrint($"[LogManager]  Registered managed logger");
             }

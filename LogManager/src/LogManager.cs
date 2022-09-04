@@ -154,6 +154,15 @@ namespace LogManager
                         }
                     };
 
+                    // Manually handle deletion ourselves, or the ModManager log will constantly get reset
+                    if (!target.config.keepOldFiles)
+                    {
+                        if (File.Exists(target.config.path))
+                        {
+                            File.Delete(target.config.path);
+                        }
+                    }
+
                     TargetPathDictionary.Add(targetPath, target);
                 }
                 else
@@ -180,15 +189,6 @@ namespace LogManager
 
         public static void RegisterLogger(Logger logger, LogTarget target, LogLevel defaultMinLevel = null)
         {
-            // Manually handle deletion ourselves, or the ModManager log will constantly get reset
-            if (!target.config.keepOldFiles)
-            {
-                if (File.Exists(target.config.path))
-                {
-                    File.Delete(target.config.path);
-                }
-            }
-
             LogLevel minLevel = defaultMinLevel is null ? LogLevel.Error : defaultMinLevel;
 
             if (ConfiguredLogLevels.TryGetValue(logger.Name, out LogLevel configuredLevel) && configuredLevel != null)

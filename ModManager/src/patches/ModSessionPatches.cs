@@ -195,7 +195,7 @@ namespace ModManager.patches
             }
 
             [HarmonyPrefix]
-            internal static bool Prefix(ref ManMods __instance)
+            internal static bool Prefix(ManMods __instance)
             {
                 ReflectedManMods.CheckReparseAllJsons.Invoke(__instance, null);
                 ModSessionInfo requestedSession = (ModSessionInfo)ReflectedManMods.m_RequestedSession.GetValue(__instance);
@@ -229,6 +229,8 @@ namespace ModManager.patches
                                 ModManager.CurrentSessionLoaded = false;
                                 ModManager.CurrentOperation = "Purging";
                                 ModManager.contentLoader.Start(currentSession, requestedSession);
+
+                                PatchContentInjection.PrintSessionInfo(requestedSession);
                             }
                         }
                         else
@@ -250,6 +252,8 @@ namespace ModManager.patches
                             ReflectedManMods.m_LoadingRequestedSessionInProgress.SetValue(__instance, false);
                             ModManager.CurrentSessionLoaded = true;
                             loader.Finish();
+
+                            PatchContentInjection.Postfix(requestedSession);
                         }
                     }
                 }
