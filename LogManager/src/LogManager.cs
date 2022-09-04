@@ -135,6 +135,16 @@ namespace LogManager
                 // Seconday cache check
                 if (!TargetPathDictionary.TryGetValue(targetPath, out target))
                 {
+
+                    // Manually handle deletion ourselves, or the ModManager log will constantly get reset
+                    if (!targetConfig.keepOldFiles)
+                    {
+                        if (File.Exists(targetConfig.path))
+                        {
+                            File.Delete(targetConfig.path);
+                        }
+                    }
+
                     target = new LogTarget
                     {
                         logFile = new FileTarget($"logfile-{targetConfig.path}")
@@ -153,15 +163,6 @@ namespace LogManager
                             keepOldFiles = targetConfig.keepOldFiles
                         }
                     };
-
-                    // Manually handle deletion ourselves, or the ModManager log will constantly get reset
-                    if (!target.config.keepOldFiles)
-                    {
-                        if (File.Exists(target.config.path))
-                        {
-                            File.Delete(target.config.path);
-                        }
-                    }
 
                     TargetPathDictionary.Add(targetPath, target);
                 }
