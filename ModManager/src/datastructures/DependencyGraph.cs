@@ -304,7 +304,12 @@ namespace ModManager.Datastructures
                 }
                 else
                 {
-                    return -this.orderPriority.CompareTo(other.orderPriority);
+                    int comparison = -this.orderPriority.CompareTo(other.orderPriority);
+                    if (comparison == 0)
+                    {
+                        return this.value.ToString().CompareTo(other.value.ToString());
+                    }
+                    return comparison;
                 }
             }
 
