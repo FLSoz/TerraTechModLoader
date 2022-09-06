@@ -44,6 +44,7 @@ namespace ModManager
         public ModManager()
         {
             ModuleInitializer.Run();
+            ModManager.ConfigureLogger();
             if (StartedGameWithParameters)
             {
                 ModManager.RequestConfiguredModSession();

@@ -17,7 +17,6 @@ namespace ModManager
                 Console.WriteLine($"[0ModManager] Initializing mod manager version v.{ModManager.Version} ...");
 
                 // Configure all loggers
-                ModManager.ConfigureLogger();
                 QMod.ConfigureLogger();
                 DependencyGraph<QMod>.ConfigureLogger();
                 DependencyGraph<Type>.ConfigureLogger();

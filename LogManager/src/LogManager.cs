@@ -180,6 +180,15 @@ namespace LogManager
                 // Seconday cache check
                 if (!TargetPathDictionary.TryGetValue(targetPath, out target))
                 {
+                    // Manually handle deletion ourselves, or the ModManager log will constantly get reset
+                    if (!targetConfig.keepOldFiles)
+                    {
+                        if (File.Exists(fullPath))
+                        {
+                            File.Delete(fullPath);
+                        }
+                    }
+
                     target = new LogTarget
                     {
                         logFile = new FileTarget($"logfile-{targetConfig.path}")
@@ -188,8 +197,8 @@ namespace LogManager
                             Layout = targetConfig.layout is null || targetConfig.layout.Length == 0 ?
                         "${longdate} ${level:uppercase=true:padding=-5:alignmentOnTruncation=left} ${logger:shortName=true} | ${message}  ${exception}" :
                         targetConfig.layout,
-                            EnableFileDelete = true,
-                            DeleteOldFileOnStartup = !targetConfig.keepOldFiles
+                            EnableFileDelete = false,
+                            DeleteOldFileOnStartup = false
                         },
                         config = new TargetConfig
                         {
