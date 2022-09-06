@@ -74,6 +74,8 @@ namespace ModManager
         internal const BindingFlags InstanceFlags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
         internal const BindingFlags StaticFlags = BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
 
+        internal static bool KEEP_OLD_LOGS = false;
+
         internal static NLog.Logger logger = NLog.LogManager.GetLogger("ModManager");
         private static NLog.Logger assemblyLogger = NLog.LogManager.GetLogger("AssemblyLoader");
         public static void ConfigureLogger()
@@ -82,7 +84,7 @@ namespace ModManager
             {
                 layout = "${longdate} ${level:uppercase=true:padding=-5:alignmentOnTruncation=left} ${logger:shortName=true} | ${message}  ${exception}",
                 filename = "ModManager",
-                keepOldFiles = false
+                keepOldFiles = KEEP_OLD_LOGS
             };
             LogTarget target = TTLogManager.RegisterLoggingTarget(targetConfig);
 

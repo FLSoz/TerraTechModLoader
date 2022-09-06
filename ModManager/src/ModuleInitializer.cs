@@ -53,10 +53,17 @@ namespace ModManager
                     {
                         ModManager.StartedGameWithParameters = true;
                     }
+                    else if (commandLineArgs[i] == "+keep_0mm_logs")
+                    {
+                        ModManager.KEEP_OLD_LOGS = true;
+                    }
                 }
 
                 // Patch snapshot load failure logging
                 SerializationLoggingPatches.Setup();
+
+
+                ModManager.logger.Info($"0MM version v.{ModManager.Version} initialized");
             }
         }
     }

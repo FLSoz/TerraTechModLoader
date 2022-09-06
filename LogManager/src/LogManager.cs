@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+using System.Text;
 using System.Collections.Generic;
 using System.Reflection;
 using System.IO;
@@ -99,17 +100,61 @@ namespace LogManager
             return logPath.Substring(index);
         }
 
+        internal static char[] InvalidFileChars = Path.GetInvalidFileNameChars();
+        internal static char[] InvalidPathChars = Path.GetInvalidPathChars();
+        internal static char[] InvalidFilePathChars = new HashSet<char>(InvalidFileChars).Concat(InvalidPathChars).ToArray();
+        private static string SanitizePath(string path)
+        {
+            if (path == null)
+            {
+                return null;
+            }
+            StringBuilder sb = new StringBuilder();
+            foreach (char letter in path)
+            {
+                if (!InvalidFilePathChars.Contains(letter) || letter == Path.PathSeparator)
+                {
+                    sb.Append(letter);
+                }
+                else
+                {
+                    sb.Append('_');
+                }
+            }
+            return sb.ToString();
+        }
+        private static string SanitizeFileName(string filename)
+        {
+            if (filename == null)
+            {
+                return null;
+            }
+            StringBuilder sb = new StringBuilder();
+            foreach (char letter in filename)
+            {
+                if (!InvalidFileChars.Contains(letter))
+                {
+                    sb.Append(letter);
+                }
+                else
+                {
+                    sb.Append('_');
+                }
+            }
+            return sb.ToString();
+        }
+
         public static LogTarget RegisterLoggingTarget(TargetConfig targetConfig)
         {
             // Preliminary cache check
             string targetPath = Path.ChangeExtension(GetFilePath(targetConfig.path, targetConfig.filename), ".log").Trim(Path.DirectorySeparatorChar);
             if (!TargetPathDictionary.TryGetValue(targetPath, out LogTarget target))
             {
-                string shortTargetName = targetConfig.filename;
+                string shortTargetName = SanitizeFileName(targetConfig.filename);
                 InfoPrint($"[LogManager] Registering logger {shortTargetName}");
 
                 // Calculate full path
-                string fullPath = targetConfig.path;
+                string fullPath = SanitizePath(targetConfig.path);
                 if (fullPath is null || fullPath.Length == 0)
                 {
                     fullPath = Path.Combine(LogsDir, $"{shortTargetName}.log");
@@ -135,16 +180,6 @@ namespace LogManager
                 // Seconday cache check
                 if (!TargetPathDictionary.TryGetValue(targetPath, out target))
                 {
-
-                    // Manually handle deletion ourselves, or the ModManager log will constantly get reset
-                    if (!targetConfig.keepOldFiles)
-                    {
-                        if (File.Exists(fullPath))
-                        {
-                            File.Delete(fullPath);
-                        }
-                    }
-
                     target = new LogTarget
                     {
                         logFile = new FileTarget($"logfile-{targetConfig.path}")
@@ -153,8 +188,8 @@ namespace LogManager
                             Layout = targetConfig.layout is null || targetConfig.layout.Length == 0 ?
                         "${longdate} ${level:uppercase=true:padding=-5:alignmentOnTruncation=left} ${logger:shortName=true} | ${message}  ${exception}" :
                         targetConfig.layout,
-                            EnableFileDelete = false,
-                            DeleteOldFileOnStartup = false
+                            EnableFileDelete = true,
+                            DeleteOldFileOnStartup = !targetConfig.keepOldFiles
                         },
                         config = new TargetConfig
                         {
@@ -185,6 +220,8 @@ namespace LogManager
                 string shortTargetName = targetName.Substring(targetName.LastIndexOf('.') + 1);
                 targetConfig.filename = shortTargetName;
             }
+            targetConfig.filename = SanitizeFileName(targetConfig.filename);
+            targetConfig.path = SanitizePath(targetConfig.path);
             return RegisterLoggingTarget(targetConfig);
         }
 

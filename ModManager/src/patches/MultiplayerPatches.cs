@@ -24,7 +24,7 @@ namespace ModManager.src.patches
                     StartInfo =
                     {
                         FileName = GetExecutablePath(),
-                        Arguments = string.Format("{0} +connect_lobby {1} +custom_mod_list {2} +ttsmm_mod_list {3}", GetCurrentArgs(), lobbyID.m_NetworkID, $"[:{ModManager.WorkshopID}]", GetTTSMMModList(modList))
+                        Arguments = string.Format("{0} +keep_0mm_logs +connect_lobby {1} +custom_mod_list {2} +ttsmm_mod_list {3}", GetCurrentArgs(), lobbyID.m_NetworkID, $"[:{ModManager.WorkshopID}]", GetTTSMMModList(modList))
                     }
                 }.Start();
                 Application.Quit();
@@ -51,7 +51,7 @@ namespace ModManager.src.patches
                         StartInfo =
                         {
                             FileName = GetExecutablePath(),
-                            Arguments = string.Format("{0} +custom_mod_list {1} +ttsmm_mod_list {2}", GetCurrentArgs(), $"[:{ModManager.WorkshopID}]", GetTTSMMModList(session))
+                            Arguments = string.Format("{0} +keep_0mm_logs +custom_mod_list {1} +ttsmm_mod_list {2}", GetCurrentArgs(), $"[:{ModManager.WorkshopID}]", GetTTSMMModList(session))
                         }
                     }.Start();
                     Application.Quit();

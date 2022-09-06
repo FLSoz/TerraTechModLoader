@@ -12,42 +12,50 @@ namespace LogManager
         {
             internal static void SetupPrefix(object __instance)
             {
-                Type type = __instance.GetType();
-                TTLogManager.InfoPrint($"[LogManager] Setting up managed logger of type {type.FullName}");
-                FieldInfo loggerIDField = AccessTools.Field(type, "loggerID");
-                FieldInfo loggerField = AccessTools.Field(type, "logger");
-                FieldInfo loggingLevelField = AccessTools.Field(type, "minLoggingLevel");
-                FieldInfo pathField = AccessTools.Field(type, "path");
-                FieldInfo layoutField = AccessTools.Field(type, "layout");
-                FieldInfo keepOldFilesField = AccessTools.Field(type, "keepOldFiles");
-                FieldInfo filenameField = AccessTools.Field(type, "filename");
-                TTLogManager.DebugPrint($"[LogManager]  Reflection setup");
-
-                string loggerID = (string)loggerIDField.GetValue(__instance);
-                byte minLoggingLevel = (byte)loggingLevelField.GetValue(__instance);
-                string path = (string)pathField.GetValue(__instance);
-                string layout = (string)layoutField.GetValue(__instance);
-                string filename = (string)filenameField.GetValue(__instance);
-                bool keepOldFiles = (bool)keepOldFilesField.GetValue(__instance);
-                TTLogManager.DebugPrint($"[LogManager]  Reflection succeeded");
-
-                NLog.Logger logger = NLog.LogManager.GetLogger(loggerID);
-                TTLogManager.DebugPrint($"[LogManager]  Setup NLog logger");
-                loggerField.SetValue(__instance, logger);
-                TTLogManager.DebugPrint($"[LogManager]  Bound NLog logger");
-
-                TargetConfig targetConfig = new TargetConfig()
+                try
                 {
-                    filename = filename,
-                    path = path,
-                    layout = layout,
-                    keepOldFiles = keepOldFiles
-                };
+                    Type type = __instance.GetType();
+                    TTLogManager.InfoPrint($"[LogManager] Setting up managed logger of type {type.FullName}");
+                    FieldInfo loggerIDField = AccessTools.Field(type, "loggerID");
+                    FieldInfo loggerField = AccessTools.Field(type, "logger");
+                    FieldInfo loggingLevelField = AccessTools.Field(type, "minLoggingLevel");
+                    FieldInfo pathField = AccessTools.Field(type, "path");
+                    FieldInfo layoutField = AccessTools.Field(type, "layout");
+                    FieldInfo keepOldFilesField = AccessTools.Field(type, "keepOldFiles");
+                    FieldInfo filenameField = AccessTools.Field(type, "filename");
+                    TTLogManager.DebugPrint($"[LogManager]  Reflection setup");
 
-                LogTarget target = TTLogManager.RegisterLoggingTarget(loggerID, targetConfig);
-                TTLogManager.DebugPrint($"[LogManager]  Located logging target");
-                TTLogManager.RegisterLogger(logger, target, NLog.LogLevel.FromOrdinal(minLoggingLevel));
-                TTLogManager.InfoPrint($"[LogManager]  Registered managed logger");
+                    string loggerID = (string)loggerIDField.GetValue(__instance);
+                    byte minLoggingLevel = (byte)loggingLevelField.GetValue(__instance);
+                    string path = (string)pathField.GetValue(__instance);
+                    string layout = (string)layoutField.GetValue(__instance);
+                    string filename = (string)filenameField.GetValue(__instance);
+                    bool keepOldFiles = (bool)keepOldFilesField.GetValue(__instance);
+                    TTLogManager.DebugPrint($"[LogManager]  Reflection succeeded");
+
+                    NLog.Logger logger = NLog.LogManager.GetLogger(loggerID);
+                    TTLogManager.DebugPrint($"[LogManager]  Setup NLog logger");
+                    loggerField.SetValue(__instance, logger);
+                    TTLogManager.DebugPrint($"[LogManager]  Bound NLog logger");
+
+                    TargetConfig targetConfig = new TargetConfig()
+                    {
+                        filename = filename,
+                        path = path,
+                        layout = layout,
+                        keepOldFiles = keepOldFiles
+                    };
+
+                    LogTarget target = TTLogManager.RegisterLoggingTarget(loggerID, targetConfig);
+                    TTLogManager.DebugPrint($"[LogManager]  Located logging target");
+                    TTLogManager.RegisterLogger(logger, target, NLog.LogLevel.FromOrdinal(minLoggingLevel));
+                    TTLogManager.InfoPrint($"[LogManager]  Registered managed logger");
+                }
+                catch (Exception e)
+                {
+                    TTLogManager.ErrorPrint("FAILED to setup logger");
+                    TTLogManager.ErrorPrint(e.ToString());
+                }
             }
 
             internal static bool FlushPrefix()
