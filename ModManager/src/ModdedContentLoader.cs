@@ -281,7 +281,7 @@ namespace ModManager
                 bool failed = false;
                 if (!script.earlyInitRun)
                 {
-                    logger.Debug(" ⏳ Processing EarlyInit for mod {}", script.Name);
+                    logger.Debug(" 💿 Processing EarlyInit for mod {}", script.Name);
                     IEnumerator<float> iterator = script.EarlyInit();
                     while (true)
                     {
@@ -332,7 +332,7 @@ namespace ModManager
             foreach (WrappedMod script in ModManager.InitQueue)
             {
                 ModManager.CurrentOperationSpecifics = $"Processing {script.Name} Init()";
-                logger.Debug(" ⏳ Processing Init for mod {}", script.Name);
+                logger.Debug(" 💿 Processing Init for mod {}", script.Name);
                 IEnumerator<float> iterator = script.Init();
                 while (true)
                 {
@@ -521,7 +521,7 @@ namespace ModManager
                         {
                             try
                             {
-                                logger.Trace($"   ⏳ Processing Loader {keyValuePair.Key}");
+                                logger.Trace($"   💿 Processing Loader {keyValuePair.Key}");
                                 if (!jsonmoduleLoader.CreateModuleForBlock(blockID, def, block, keyValuePair.Value))
                                 {
                                     logger.Error(string.Format("   ❌ Failed to parse module {0} in JSON for {1}", keyValuePair.Key, def));
@@ -647,7 +647,7 @@ namespace ModManager
                                 moduleDamage.maxHealth = moddedBlockDefinition.m_MaxHealth;
                                 if (moduleDamage.deathExplosion == null)
                                 {
-                                    logger.Trace(" 💥 Adding default DeathExplosion");
+                                    logger.Trace("  💥 Adding default DeathExplosion");
                                     moduleDamage.deathExplosion = manMods.m_DefaultBlockExplosion;
                                 }
                                 foreach (MeshRenderer meshRenderer in physicalPrefab.GetComponentsInChildren<MeshRenderer>())
@@ -772,11 +772,11 @@ namespace ModManager
                 logger.Trace(" 🟢 Adding ModManager.Current modded blocks");
                 foreach (KeyValuePair<int, Dictionary<int, Dictionary<BlockTypes, ModdedBlockDefinition>>> corpBlocks in gradeBlocksPerCorp)
                 {
-                    logger.Debug($" ▶ Processing blocks in corp {corpBlocks.Key}");
+                    logger.Debug($"  ▶ Processing blocks in corp '{GetCorpName(corpBlocks.Key)}'");
                     ModdedCorpDefinition corpDefinition = manMods.GetCorpDefinition((FactionSubTypes)corpBlocks.Key, this.requestedSession);
                     foreach (KeyValuePair<int, Dictionary<BlockTypes, ModdedBlockDefinition>> gradeBlocks in corpBlocks.Value)
                     {
-                        logger.Trace($" ➤ Processing blocks in grade {gradeBlocks.Key}");
+                        logger.Trace($"   ➤ Processing blocks in grade {gradeBlocks.Key}");
                         blockUnlockTable.AddModdedBlocks(corpBlocks.Key, gradeBlocks.Key, gradeBlocks.Value);
                         if (manMods.IsModdedCorp((FactionSubTypes)corpBlocks.Key))
                         {
@@ -797,6 +797,33 @@ namespace ModManager
             ModManager.CurrentOperationSpecifics = null;
             yield return null;
             yield break;
+        }
+
+        internal static Dictionary<FactionSubTypes, string> vanillaCorpToString = new Dictionary<FactionSubTypes, string>();
+
+        internal static void Setup()
+        {
+            int[] values = Enum.GetValues(typeof(FactionSubTypes)).Cast<int>().ToArray();
+            foreach (int corpID in values)
+            {
+                FactionSubTypes corp = (FactionSubTypes) corpID;
+                string name = Enum.GetName(typeof(FactionSubTypes), corp);
+                vanillaCorpToString.Add(corp, name);
+            }
+        }
+
+        private static string GetCorpName(int corpID)
+        {
+            if (vanillaCorpToString.TryGetValue((FactionSubTypes)corpID, out string name))
+            {
+                return name;
+            }
+            string moddedCorpName = manMods.FindCorpShortName((FactionSubTypes) corpID);
+            if (moddedCorpName != null)
+            {
+                return moddedCorpName;
+            }
+            return corpID.ToString();
         }
 
         private IEnumerator SetupModdedCorpSkins()

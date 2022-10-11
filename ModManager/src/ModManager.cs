@@ -302,6 +302,16 @@ namespace ModManager
             typeof(ManMods).GetMethod("CheckForSteamWorkshopMods", InstanceFlags).Invoke(manMods, null);
         }
 
+        private static string GetShortAssemblyName(string longName)
+        {
+            int endIndex = longName.IndexOf(", Version=");
+            if (endIndex > 0)
+            {
+                return longName.Substring(0, endIndex);
+            }
+            return longName;
+        }
+
         internal static bool TryFindAssembly(ModContainer mod, string name, out Assembly assembly)
         {
             assembly = null;
@@ -321,9 +331,9 @@ namespace ModManager
 
             foreach (FileInfo dll in dlls)
             {
-                if (name.Contains(Path.GetFileNameWithoutExtension(dll.Name)))
+                if (GetShortAssemblyName(name).Contains(Path.GetFileNameWithoutExtension(dll.Name)))
                 {
-                    assemblyLogger.Trace("✔️ Found assembly {assembly} at path {path}", name, dll.FullName);
+                    assemblyLogger.Trace("  ✔️ Found assembly {assembly} at path {path}", name, dll.FullName);
                     assembly = Assembly.LoadFrom(dll.FullName);
                     return true;
                 }
@@ -349,9 +359,14 @@ namespace ModManager
                     Dictionary<string, ModContainer> mods = (Dictionary<string, ModContainer>)ReflectedManMods.m_Mods.GetValue(Singleton.Manager<ManMods>.inst);
 
                     // Try to get .dll from mod that shares its name, if extant
-                    if (mods.TryGetValue(args.Name, out ModContainer mod))
+                    string shortName = GetShortAssemblyName(args.Name);
+                    if (shortName != args.Name)
                     {
-                        assemblyLogger.Trace($" 🔎 Found mod with name {args.Name}, searching for assembly");
+                        assemblyLogger.Trace(" 🛈 Determined name {short} to be short form of {long}", shortName, args.Name);
+                    }
+                    if (mods.TryGetValue(shortName, out ModContainer mod))
+                    {
+                        assemblyLogger.Trace($" 🔎 Found mod with name {args.Name}");
                         if (TryFindAssembly(mod, args.Name, out Assembly assembly))
                         {
                             assemblyLogger.Trace($" ✔️ Assembly found");
@@ -1047,7 +1062,7 @@ namespace ModManager
             {
                 try
                 {
-                    logger.Trace($"⏳ Firing Update for '{script.Name}'");
+                    logger.Trace($"💿 Firing Update for '{script.Name}'");
                     script.Update();
                 }
                 catch (Exception e)
@@ -1063,7 +1078,7 @@ namespace ModManager
             {
                 try
                 {
-                    logger.Trace($"⏳ Firing FixedUpdate for '{script.Name}'");
+                    logger.Trace($"💿 Firing FixedUpdate for '{script.Name}'");
                     script.FixedUpdate();
                 }
                 catch (Exception e)

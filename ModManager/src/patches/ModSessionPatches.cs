@@ -47,6 +47,7 @@ namespace ModManager.patches
                 {
                     Dictionary<string, JSONModuleLoader> allLoaders = (Dictionary<string, JSONModuleLoader>)sLoaders.GetValue(null);
                     allLoaders.Clear();
+                    ModManager.logger.Info("🗑️ Purged modded JSONLoaders, reloading vanilla loaders");
                     VanillaModuleLoaders.RegisterVanillaModules();
                 }
             }

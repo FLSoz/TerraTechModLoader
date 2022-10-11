@@ -153,6 +153,7 @@ namespace ModManager
             yield return 0.0f;
             if (this.managedMod != null)
             {
+                ModdedContentLoader.logger.Trace("  👉 Running EarlyInit for MANAGED Mod {Mod}", Name);
                 IEnumerator<float> iterator = this.managedMod.EarlyInit();
                 while (iterator.MoveNext())
                 {
@@ -163,12 +164,12 @@ namespace ModManager
             {
                 if (this.officialMod.HasEarlyInit())
                 {
-                    ModdedContentLoader.logger.Info("👉 Running EarlyInit for Mod {Mod}", Name);
+                    ModdedContentLoader.logger.Info("  👉 Running EarlyInit for Mod {Mod}", Name);
                     this.officialMod.EarlyInit();
                 }
                 else
                 {
-                    ModdedContentLoader.logger.Info("🛈 Mod {Mod} has no EarlyInit", Name);
+                    ModdedContentLoader.logger.Info("  🛈 Mod {Mod} has no EarlyInit", Name);
                 }
             }
             yield return 1.0f;
@@ -180,7 +181,7 @@ namespace ModManager
             yield return 0.0f;
             if (this.managedMod != null)
             {
-                ModdedContentLoader.logger.Trace("👉 Running Init for MANAGED Mod {Mod}", Name);
+                ModdedContentLoader.logger.Trace("  👉 Running Init for MANAGED Mod {Mod}", Name);
                 IEnumerator<float> iterator = this.managedMod.Init();
                 while (iterator.MoveNext())
                 {
@@ -189,7 +190,7 @@ namespace ModManager
             }
             else
             {
-                ModdedContentLoader.logger.Trace("👉 Running Init for NON-MANAGED Mod {Mod}", Name);
+                ModdedContentLoader.logger.Trace("  👉 Running Init for NON-MANAGED Mod {Mod}", Name);
                 this.officialMod.Init();
             }
             yield return 1.0f;

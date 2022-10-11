@@ -16,6 +16,9 @@ namespace ModManager
                 Inited = true;
                 Console.WriteLine($"[0ModManager] Initializing mod manager version v.{ModManager.Version} ...");
 
+                // setup
+                ModdedContentLoader.Setup();
+
                 // Configure all loggers
                 QMod.ConfigureLogger();
                 DependencyGraph<QMod>.ConfigureLogger();
