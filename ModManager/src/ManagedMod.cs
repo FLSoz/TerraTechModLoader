@@ -60,7 +60,7 @@ namespace ModManager
 
         public static ManagedMod FromMod(Type mod)
         {
-            ModManager.logger.Trace($"Setting up ManagedMod for type {mod}");
+            ModManager.logger.Trace($"🟢 Setting up ManagedMod for type {mod}");
             MethodInfo _ManagedEarlyInit = AccessTools.Method(mod, "ManagedEarlyInit");
 
             MethodInfo[] allMethods = mod.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
@@ -291,7 +291,7 @@ namespace ModManager
         {
             if (this._ManagedIteratorDeInit != null)
             {
-                ModManager.logger.Trace($"Iterator DeInit of {this.instanceType.FullName}");
+                ModdedContentLoader.logger.Trace($"   🛠️ Iterator DeInit of {this.instanceType.FullName}");
                 IEnumerator<float> iterator = (IEnumerator<float>)this._ManagedIteratorDeInit.Invoke(this.Instance, null);
                 while (iterator.MoveNext())
                 {
@@ -300,7 +300,7 @@ namespace ModManager
             }
             else
             {
-                ModManager.logger.Trace($"Standard DeInit of {this.instanceType.FullName}");
+                ModdedContentLoader.logger.Trace($"   🔨 Standard DeInit of {this.instanceType.FullName}");
                 this.Instance.DeInit();
             }
             yield break;
@@ -310,7 +310,7 @@ namespace ModManager
         {
             if (this._ManagedIteratorEarlyInit != null)
             {
-                ModManager.logger.Trace($"Iterator EarlyInit of {this.instanceType.FullName}");
+                ModdedContentLoader.logger.Trace($"   🛠️ Iterator EarlyInit of {this.instanceType.FullName}");
                 IEnumerator<float> iterator = (IEnumerator<float>) this._ManagedIteratorEarlyInit.Invoke(this.Instance, null);
                 while (iterator.MoveNext())
                 {
@@ -319,17 +319,17 @@ namespace ModManager
             }
             else if (this._ManagedEarlyInit != null)
             {
-                ModManager.logger.Trace($"Managed EarlyInit of {this.instanceType.FullName}");
+                ModdedContentLoader.logger.Trace($"   🛠️ Managed EarlyInit of {this.instanceType.FullName}");
                 this._ManagedEarlyInit.Invoke(this.Instance, null);
             }
             else if (this.Instance.HasEarlyInit())
             {
-                ModManager.logger.Trace($"Standard EarlyInit of {this.instanceType.FullName}");
+                ModdedContentLoader.logger.Trace($"   🔨 Standard EarlyInit of {this.instanceType.FullName}");
                 this.Instance.EarlyInit();
             }
             else
             {
-                ModManager.logger.Trace($"NO EarlyInit of {this.instanceType.FullName}");
+                ModdedContentLoader.logger.Trace($"   🛈 NO EarlyInit of {this.instanceType.FullName}");
             }
             yield break;
         }
@@ -338,7 +338,7 @@ namespace ModManager
         {
             if (this._ManagedIteratorInit != null)
             {
-                ModManager.logger.Trace($"Iterator Init of {this.instanceType.FullName}");
+                ModdedContentLoader.logger.Trace($"   🛠️ Iterator Init of {this.instanceType.FullName}");
                 IEnumerator<float> iterator = (IEnumerator<float>)this._ManagedIteratorInit.Invoke(this.Instance, null);
                 while (iterator.MoveNext())
                 {
@@ -347,7 +347,7 @@ namespace ModManager
             }
             else
             {
-                ModManager.logger.Trace($"Standard Init of {this.instanceType.FullName}");
+                ModdedContentLoader.logger.Trace($"   🔨 Standard Init of {this.instanceType.FullName}");
                 this.Instance.Init();
             }
             yield break;

@@ -10,6 +10,16 @@ namespace LogManager
     {
         internal static class SupportedLoggerPatch
         {
+            internal static Exception Finalizer(Exception __exception)
+            {
+                if (__exception != null)
+                {
+                    TTLogManager.ErrorPrint("FAILED PATCH to setup Logger:");
+                    TTLogManager.ErrorPrint(__exception.ToString());
+                }
+                return null;
+            }
+
             internal static void SetupPrefix(object __instance)
             {
                 try
@@ -48,8 +58,9 @@ namespace LogManager
 
                     LogTarget target = TTLogManager.RegisterLoggingTarget(loggerID, targetConfig);
                     TTLogManager.DebugPrint($"[LogManager]  Located logging target");
-                    TTLogManager.RegisterLogger(logger, target, NLog.LogLevel.FromOrdinal(minLoggingLevel));
-                    TTLogManager.InfoPrint($"[LogManager]  Registered managed logger");
+                    NLog.LogLevel level = NLog.LogLevel.FromOrdinal(minLoggingLevel);
+                    TTLogManager.RegisterLogger(logger, target, level);
+                    TTLogManager.InfoPrint($"[LogManager]  Registered managed logger '{loggerID}' with level {level}");
                 }
                 catch (Exception e)
                 {
@@ -67,25 +78,37 @@ namespace LogManager
             internal static bool LogPrefix(object __instance, byte level, string message)
             {
                 FieldInfo loggerField = AccessTools.Field(__instance.GetType(), "logger");
-                NLog.Logger logger = (NLog.Logger) loggerField.GetValue(__instance);
-                logger.Log(NLog.LogLevel.FromOrdinal(level), message);
-                return false;
+                object loggerValue = loggerField.GetValue(__instance);
+                if (loggerValue != null && loggerValue is NLog.Logger logger)
+                {
+                    logger.Log(NLog.LogLevel.FromOrdinal(level), message);
+                    return false;
+                }
+                return true;
             }
 
             internal static bool LogExceptionPrefix(object __instance, byte level, Exception exception)
             {
                 FieldInfo loggerField = AccessTools.Field(__instance.GetType(), "logger");
-                NLog.Logger logger = (NLog.Logger)loggerField.GetValue(__instance);
-                logger.Log(NLog.LogLevel.FromOrdinal(level), exception);
-                return false;
+                object loggerValue = loggerField.GetValue(__instance);
+                if (loggerValue != null && loggerValue is NLog.Logger logger)
+                {
+                    logger.Log(NLog.LogLevel.FromOrdinal(level), exception);
+                    return false;
+                }
+                return true;
             }
 
             internal static bool LogExceptionParamsPrefix(object __instance, byte level, Exception exception, string message)
             {
                 FieldInfo loggerField = AccessTools.Field(__instance.GetType(), "logger");
-                NLog.Logger logger = (NLog.Logger)loggerField.GetValue(__instance);
-                logger.Log(NLog.LogLevel.FromOrdinal(level), message, exception);
-                return false;
+                object loggerValue = loggerField.GetValue(__instance);
+                if (loggerValue != null && loggerValue is NLog.Logger logger)
+                {
+                    logger.Log(NLog.LogLevel.FromOrdinal(level), message, exception);
+                    return false;
+                }
+                return true;
             }
         }
 

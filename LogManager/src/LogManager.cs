@@ -236,30 +236,37 @@ namespace LogManager
 
         public static void RegisterLogger(Logger logger, LogTarget target, LogLevel defaultMinLevel = null)
         {
-            LogLevel minLevel = defaultMinLevel is null ? LogLevel.Error : defaultMinLevel;
-
-            if (ConfiguredLogLevels.TryGetValue(logger.Name, out LogLevel configuredLevel) && configuredLevel != null)
+            LogLevel minLevel = defaultMinLevel;
+            if (minLevel == null)
             {
-                DebugPrint($"[LogManager]  Registering logger {logger.Name} with logging level {configuredLevel} at {target.config.path}");
-                minLevel = configuredLevel;
-            }
-            else
-            {
-                string shortLoggerName = logger.Name.Substring(logger.Name.LastIndexOf('.') + 1);
-                if (ConfiguredLogLevels.TryGetValue(shortLoggerName, out configuredLevel) && configuredLevel != null)
+                minLevel = LogLevel.Error;
+                if (ConfiguredLogLevels.TryGetValue(logger.Name, out LogLevel configuredLevel) && configuredLevel != null)
                 {
-                    DebugPrint($"[LogManager]  Registering logger {shortLoggerName} with logging level {configuredLevel} at {target.config.path}");
+                    DebugPrint($"[LogManager]  Registering logger {logger.Name} with logging level {configuredLevel} at {target.config.path}");
                     minLevel = configuredLevel;
-                }
-                else if (ConfiguredGlobalLogLevel != null)
-                {
-                    DebugPrint($"[LogManager]  Registering logger {shortLoggerName} with GLOBAL DEFAULT logging level {ConfiguredGlobalLogLevel} at {target.config.path}");
-                    minLevel = ConfiguredGlobalLogLevel;
                 }
                 else
                 {
-                    DebugPrint($"[LogManager]  Registering logger {shortLoggerName} with default logging level {minLevel} at {target.config.path}");
+                    string shortLoggerName = logger.Name.Substring(logger.Name.LastIndexOf('.') + 1);
+                    if (ConfiguredLogLevels.TryGetValue(shortLoggerName, out configuredLevel) && configuredLevel != null)
+                    {
+                        DebugPrint($"[LogManager]  Registering logger {shortLoggerName} with logging level {configuredLevel} at {target.config.path}");
+                        minLevel = configuredLevel;
+                    }
+                    else if (ConfiguredGlobalLogLevel != null)
+                    {
+                        DebugPrint($"[LogManager]  Registering logger {shortLoggerName} with GLOBAL DEFAULT logging level {ConfiguredGlobalLogLevel} at {target.config.path}");
+                        minLevel = ConfiguredGlobalLogLevel;
+                    }
+                    else
+                    {
+                        DebugPrint($"[LogManager]  Registering logger {shortLoggerName} with default logging level {minLevel} at {target.config.path}");
+                    }
                 }
+            }
+            else
+            {
+                DebugPrint($"[LogManager]  Registering logger {logger.Name} with specified logging level {minLevel} at {target.config.path}");
             }
 
             if (EnableVanillaLogs)
@@ -331,7 +338,11 @@ namespace LogManager
                     {
                         InfoPrint($"[LogManager] Logger {type.FullName} validated, attempting patch");
                         // Setup patch
-                        harmony.Patch(setup, prefix: new HarmonyMethod(AccessTools.Method(typeof(Patches.SupportedLoggerPatch), nameof(Patches.SupportedLoggerPatch.SetupPrefix))));
+                        harmony.Patch(
+                            setup,
+                            prefix: new HarmonyMethod(AccessTools.Method(typeof(Patches.SupportedLoggerPatch), nameof(Patches.SupportedLoggerPatch.SetupPrefix))),
+                            finalizer: new HarmonyMethod(AccessTools.Method(typeof(Patches.SupportedLoggerPatch), nameof(Patches.SupportedLoggerPatch.Finalizer)))
+                        );
                         DebugPrint("[LogManager]  Patched logger setup");
 
                         // Actual logging patches

@@ -89,9 +89,9 @@ namespace ModManager
             };
             LogTarget target = TTLogManager.RegisterLoggingTarget(targetConfig);
 
-            TTLogManager.RegisterLogger(logger, target, LogLevel.Warn);
-            TTLogManager.RegisterLogger(assemblyLogger, target, LogLevel.Warn);
-            TTLogManager.RegisterLogger(ModdedContentLoader.logger, target, LogLevel.Warn);
+            TTLogManager.RegisterLogger(logger, target);
+            TTLogManager.RegisterLogger(assemblyLogger, target);
+            TTLogManager.RegisterLogger(ModdedContentLoader.logger, target);
         }
 
         internal static Harmony harmony = new Harmony(HarmonyID);
@@ -174,7 +174,7 @@ namespace ModManager
             {
                 harmony.PatchAll();
                 patched = true;
-                logger.Info("Patch applied");
+                logger.Info("🩹 Patch applied");
             }
         }
 
@@ -204,7 +204,7 @@ namespace ModManager
             }
             else
             {
-                logger.Error("FAILED TO FETCH 0ModManager ModContainer");
+                logger.Error("❌ FAILED TO FETCH 0ModManager ModContainer");
             }
         }
 
@@ -239,14 +239,14 @@ namespace ModManager
                 {
                     foreach (string mod in mods)
                     {
-                        logger.Info($"Processing mod {mod}");
+                        logger.Info($"▶ Processing mod {mod}");
                         string trimmedMod = mod.Trim(new char[] { '[', ']', ' ' });
                         string[] modDescrip = trimmedMod.Split(new char[] { ':' }, 2);
                         if (modDescrip.Length == 2)
                         {
                             string type = modDescrip[0];
                             string modName = modDescrip[1];
-                            logger.Info($"  Mod ({modName}) determined to be of type {type}");
+                            logger.Debug($"  💿 Mod ({modName}) determined to be of type {type}");
                             switch (type)
                             {
                                 case "local":
@@ -270,23 +270,23 @@ namespace ModManager
                                             },
                                             false);
                                             // We enforce that this is not remote
-                                            logger.Info("  Loading workshop mod {WorkshopID}", steamWorkshopID);
+                                            logger.Debug("  ☁️ Loading workshop mod {WorkshopID}", steamWorkshopID);
                                         }
                                         else
                                         {
-                                            logger.Info("  Requested self - ignoring");
+                                            logger.Info("  🛈 Requested self - ignoring");
                                         }
                                     }
                                     else
                                     {
-                                        logger.Error("  Attempted to load workshop mod with malformed ID {WorkshopID}", modName);
+                                        logger.Error("  ❌ Attempted to load workshop mod with malformed ID {WorkshopID}", modName);
                                     }
                                     break;
                                 case "ttqmm":
-                                    logger.Error("  Attempted to load mod {Mod} from TTMM. This is currently unsupported", modName);
+                                    logger.Error("  ❌ Attempted to load mod {Mod} from TTMM. This is currently unsupported", modName);
                                     break;
                                 default:
-                                    logger.Error("  Found malformed mod request {Mod}", trimmedMod);
+                                    logger.Error("  ❌ Found malformed mod request {Mod}", trimmedMod);
                                     break;
                             }
                         }
@@ -296,7 +296,7 @@ namespace ModManager
             }
 
             // We explicitly loaded only this mod. 
-            logger.Info("No custom mod list found - getting default mod loading behaviour");
+            logger.Info("🚨 No custom mod list found - getting default mod loading behaviour");
             ManMods manMods = Singleton.Manager<ManMods>.inst;
             typeof(ManMods).GetMethod("CheckForLocalMods", InstanceFlags).Invoke(manMods, null);
             typeof(ManMods).GetMethod("CheckForSteamWorkshopMods", InstanceFlags).Invoke(manMods, null);
@@ -304,7 +304,6 @@ namespace ModManager
 
         internal static bool TryFindAssembly(ModContainer mod, string name, out Assembly assembly)
         {
-            assemblyLogger.Trace("Checking if mod {mod} with bundle at {path} has {assembly}", mod.ModID, mod.AssetBundlePath, name);
             assembly = null;
             ModContents contents = mod.Contents;
 
@@ -324,7 +323,7 @@ namespace ModManager
             {
                 if (name.Contains(Path.GetFileNameWithoutExtension(dll.Name)))
                 {
-                    assemblyLogger.Trace("Found assembly {assembly} at path {path}", name, dll.FullName);
+                    assemblyLogger.Trace("✔️ Found assembly {assembly} at path {path}", name, dll.FullName);
                     assembly = Assembly.LoadFrom(dll.FullName);
                     return true;
                 }
@@ -340,7 +339,7 @@ namespace ModManager
                 AppDomain.CurrentDomain.AssemblyResolve += delegate (object sender, ResolveEventArgs args)
                 {
                     string behalfString = args.RequestingAssembly != null ? $" as dependency of ({args.RequestingAssembly})" : "";
-                    assemblyLogger.Trace($"Searching for assembly ({args.Name}){behalfString}");
+                    assemblyLogger.Trace($"🔍 Searching for assembly ({args.Name}){behalfString}");
 
                     ModSessionInfo session = (ModSessionInfo)ReflectedManMods.m_CurrentSession.GetValue(Singleton.Manager<ManMods>.inst);
                     if (session == null)
@@ -352,21 +351,21 @@ namespace ModManager
                     // Try to get .dll from mod that shares its name, if extant
                     if (mods.TryGetValue(args.Name, out ModContainer mod))
                     {
-                        assemblyLogger.Trace($" Found mod with name {args.Name}, searching for assembly");
+                        assemblyLogger.Trace($" 🔎 Found mod with name {args.Name}, searching for assembly");
                         if (TryFindAssembly(mod, args.Name, out Assembly assembly))
                         {
-                            assemblyLogger.Trace($"  Assembly found");
+                            assemblyLogger.Trace($" ✔️ Assembly found");
                             return assembly;
                         }
                         else
                         {
-                            assemblyLogger.Trace($" Mod {args.Name}, did not contain assembly, searching entire session");
+                            assemblyLogger.Trace($" 🛈 Mod {args.Name}, did not contain assembly, searching entire session");
                         }
                     }
 
                     foreach (string key in session.Mods.Keys)
                     {
-                        assemblyLogger.Trace($" Session contains mod {key}, searching for assembly {args.Name}");
+                        assemblyLogger.Trace($" 🔎 Session contains mod {key}, searching for assembly {args.Name}");
                         if (key != args.Name)
                         {
                             ModContainer modContainer;
@@ -374,18 +373,18 @@ namespace ModManager
                             {
                                 if (TryFindAssembly(modContainer, args.Name, out Assembly assembly))
                                 {
-                                    assemblyLogger.Trace($"  Assembly found");
+                                    assemblyLogger.Trace($" ✔️ Assembly found");
                                     return assembly;
                                 }
                             }
                             else
                             {
-                                assemblyLogger.Trace(" No mod container found, skipping");
+                                assemblyLogger.Trace(" ⏭ No mod container found, skipping");
                             }
                         }
                         else
                         {
-                            assemblyLogger.Trace($"Already checked mod {args.Name}, skipping");
+                            assemblyLogger.Trace($" ⏭ Already checked mod {args.Name}, skipping");
                         }
                     }
 
@@ -408,18 +407,18 @@ namespace ModManager
                                             && !(bool)isEnabled
                                         )
                                         {
-                                            logger.Warn("Found QMod assembly {Assembly}, but it's marked as DISABLED", dll.Name);
+                                            logger.Warn("❌ Found QMod assembly {Assembly}, but it's marked as DISABLED", dll.Name);
                                             return false;
                                         }
                                         else
                                         {
-                                            logger.Info("Found QMod assembly {Assembly}, marked as ENABLED", dll.Name);
+                                            logger.Info("✔️ Found QMod assembly {Assembly}, marked as ENABLED", dll.Name);
                                         }
                                     }
                                     catch
                                     {
                                         // If mod.json fails to parse, then assume it's enabled
-                                        logger.Error("FAILED to parse QMod status for mod {Assembly}, marking as DISABLED", dll.Name);
+                                        logger.Error("❌ FAILED to parse QMod status for mod {Assembly}, marking as DISABLED", dll.Name);
                                         return false;
                                     }
                                 }
@@ -432,18 +431,18 @@ namespace ModManager
                         {
                             if (args.Name.Contains(Path.GetFileNameWithoutExtension(dll.Name)))
                             {
-                                logger.Info("Found QMod assembly {assembly}", args.Name);
+                                logger.Info("✔️ Found QMod assembly {assembly}", args.Name);
                                 return Assembly.LoadFrom(dll.FullName);
                             }
                         }
                     }
 
-                    assemblyLogger.Warn(" Could not find assembly {assembly}", args.Name);
+                    assemblyLogger.Warn("❌ Could not find assembly {assembly}", args.Name);
                     return null;
                 };
 
                 patchedAssemblyLoading = true;
-                assemblyLogger.Info("Patched Assembly Loading");
+                assemblyLogger.Info("🩹 Patched Assembly Loading");
             }
         }
 
@@ -468,12 +467,12 @@ namespace ModManager
                     }
                     else
                     {
-                        logger.Debug($"Mod {modID} BLOCKED from being processed");
+                        logger.Debug($" ⚠️ Mod {modID} BLOCKED from being processed");
                     }
                 }
                 else
                 {
-                    logger.Warn($"Mod {modID} is present, but not in session");
+                    logger.Warn($" 🚨 Mod {modID} is present, but not in session");
                 }
             }
             // add edges
@@ -486,11 +485,11 @@ namespace ModManager
                     IManagedMod managedMod;
                     if (!((managedMod = mod.ManagedMod()) is null))
                     {
-                        logger.Debug("Processing edges for {Mod}", managedMod.Name);
+                        logger.Debug(" ▶ Processing edges for {Mod}", managedMod.Name);
                         Type[] loadBefore = getBefore(managedMod);
                         if (loadBefore != null && loadBefore.Length > 0)
                         {
-                            logger.Debug("  Found LoadBefore Targets: {Targets}", loadBefore);
+                            logger.Debug("  ➤ Found LoadBefore Targets: {Targets}", loadBefore);
                             foreach (Type target in loadBefore)
                             {
                                 try
@@ -499,7 +498,7 @@ namespace ModManager
                                 }
                                 catch (Exception ex)
                                 {
-                                    logger.Error(ex, "Unable to set constraint to load {mod} before {target}", mod.Name, target.Name);
+                                    logger.Error(ex, " ❌ Unable to set constraint to load {mod} before {target}", mod.Name, target.Name);
                                 }
                             }
                         }
@@ -507,7 +506,7 @@ namespace ModManager
                         Type[] loadAfter = getAfter(managedMod);
                         if (loadAfter != null && loadAfter.Length > 0)
                         {
-                            logger.Debug("  Found LoadAfter Targets: {Targets}", loadAfter);
+                            logger.Debug("  ➤ Found LoadAfter Targets: {Targets}", loadAfter);
                             foreach (Type target in loadAfter)
                             {
                                 try
@@ -516,7 +515,7 @@ namespace ModManager
                                 }
                                 catch (Exception ex)
                                 {
-                                    logger.Error(ex, "Unable to set constraint to load {mod} after {target}", mod.Name, target.Name);
+                                    logger.Error(ex, " ❌ Unable to set constraint to load {mod} after {target}", mod.Name, target.Name);
                                 }
                             }
                         }
@@ -527,7 +526,7 @@ namespace ModManager
             // Get dependency trees
             if (dependencies.HasCycles())
             {
-                logger.Error("CIRCULAR DEPENDENCY DETECTED! See ModManager.log for details");
+                logger.Error(" 🚨 CIRCULAR DEPENDENCY DETECTED! See ModManager.log for details");
                 throw new Exception("CIRCULAR DEPENDENCY FOUND");
                 List<List<int>> cycles = dependencies.FindCycles();
                 dependencies.PrintCycles(LogLevel.Debug, cycles);
@@ -706,7 +705,7 @@ namespace ModManager
             bool isWorkshop = workshopID != PublishedFileId_t.Invalid && !modContainer.Local;
             string localString = isWorkshop ? "WORKSHOP" : "LOCAL";
 
-            logger.Debug(" Processing assembly {Assembly}", assembly.FullName);
+            logger.Debug(" 📦 Processing assembly {Assembly}", assembly.FullName);
 
             Type[] types = null;
             try
@@ -715,7 +714,7 @@ namespace ModManager
             }
             catch (System.Reflection.ReflectionTypeLoadException ex)
             {
-                logger.Error("  Failed to get types for {Assembly} - assuming dependency failure, saving for forced reload", assembly.FullName);
+                logger.Error("  ❌ Failed to get types for {Assembly} - assuming dependency failure, saving for forced reload", assembly.FullName);
                 logger.Error(ex);
                 return null;
             }
@@ -725,7 +724,7 @@ namespace ModManager
             foreach (Type type in types)
             {
                 if (!KNOWN_ASSEMBLIES.ToList().Contains(assembly.GetName().Name)) {
-                    logger.Trace("    Type Found: {Type}", type.FullName);
+                    logger.Trace("    🔎 Type Found: {Type}", type.FullName);
                 }
 
                 if (typeof(ModBase).IsAssignableFrom(type) && !typeof(ModManager).IsAssignableFrom(type))
@@ -744,14 +743,14 @@ namespace ModManager
                             ManagedMod managedMod = ManagedMod.FromMod(type);
                             if (!(managedMod is null))
                             {
-                                logger.Debug("  Located MANAGED {Local} mod {Script} in mod {Mod} ({ModId})",
+                                logger.Debug("  🔎 Located MANAGED {Local} mod {Script} in mod {Mod} ({ModId})",
                                     localString, type.Name, contents.ModName,
                                     isWorkshop ? modContainer.ModID + " - " + workshopID.ToString() : modContainer.ModID);
                                 wrappedMod = new WrappedMod(managedMod as IManagedMod, modContainer, source);
                             }
                             else
                             {
-                                logger.Debug("  Located NON-MANAGED {Local} mod {Script} in mod {Mod} ({ModId})",
+                                logger.Debug("  🔎 Located NON-MANAGED {Local} mod {Script} in mod {Mod} ({ModId})",
                                     localString, type.Name, contents.ModName,
                                     isWorkshop ? modContainer.ModID + " - " + workshopID.ToString() : modContainer.ModID);
                                 ModBase createdMod = (Activator.CreateInstance(type) as ModBase);
@@ -772,7 +771,7 @@ namespace ModManager
                     }
                     else
                     {
-                        logger.Debug("  Already processed {Local} mod {Script} in mod {Mod} ({ModId}). Using first loaded in {LoadedLocal} {LoadedMod} ({LoadedModId})",
+                        logger.Debug("  ⏩ Already processed {Local} mod {Script} in mod {Mod} ({ModId}). Using first loaded in {LoadedLocal} {LoadedMod} ({LoadedModId})",
                             localString, type.Name, contents.ModName,
                             isWorkshop ? modContainer.ModID + " - " + workshopID.ToString() : modContainer.ModID,
                             wrappedMod.source.IsWorkshop ? "WORKSHOP" : "LOCAL", wrappedMod.source.Name,
@@ -808,7 +807,7 @@ namespace ModManager
             Dictionary<string, ModContainer> mods = (Dictionary<string, ModContainer>)ReflectedManMods.m_Mods.GetValue(Singleton.Manager<ManMods>.inst);
 
             // Clear out any and all script mods that are present
-            logger.Info($"Reprocessing all mods in session: {session.Mods.Count}");
+            logger.Info($"⏳ Reprocessing all mods in session: {session.Mods.Count}");
             int numMods = session.Mods.Count;
             int processed = 0;
             CurrentOperation = "Processing potential code mods";
@@ -816,7 +815,7 @@ namespace ModManager
             {
                 CurrentOperationSpecifics = $"Post-processing {key}";
                 CurrentOperationProgress = (float) processed / (float) numMods;
-                logger.Debug($"Trying to locate mods in mod ID {key}");
+                logger.Debug($"🔍 Trying to locate mods in mod ID {key}");
 
                 ModContainer modContainer;
                 if (mods.TryGetValue(key, out modContainer) && modContainer != null)
@@ -833,17 +832,17 @@ namespace ModManager
                     }
 
                     DirectoryInfo parentDirectory = Directory.GetParent(modContainer.AssetBundlePath);
-                    logger.Info($"Checking for mods in directory {parentDirectory} for mod ({key})");
+                    logger.Info($"📁 Checking for mods in directory {parentDirectory} for mod ({key})");
                     foreach (FileInfo fileInfo in parentDirectory.EnumerateFiles())
                     {
                         // Ignore loading ModManager
                         if (fileInfo.Extension == ".dll" && !fileInfo.Name.Contains("ModManager") && !fileInfo.Name.Contains("AssemblyLoader") && !fileInfo.Name.Contains("NLog"))
                         {
                             Assembly assembly = Assembly.LoadFrom(fileInfo.FullName);
-                            logger.Trace($" Checking dll ${fileInfo.FullName}");
+                            logger.Trace($" 📦 Checking dll ${fileInfo.FullName}");
                             if (assemblyMetadata.TryGetValue(assembly, out ModContainer existingMod))
                             {
-                                logger.Debug("  Attempting to load assembly {Assembly} as part of Mod {Mod} ({ModID} - {ModLocal}), but assembly is already loaded by mod {ExistingMod} ({ExistingModID} - {ExistingModLocal})",
+                                logger.Debug("  ⏩ Attempting to load assembly {Assembly} as part of Mod {Mod} ({ModID} - {ModLocal}), but assembly is already loaded by mod {ExistingMod} ({ExistingModID} - {ExistingModLocal})",
                                     assembly.FullName,
                                     modContainer.Contents.ModName, modContainer.ModID,
                                     modContainer.Contents.m_WorkshopId != PublishedFileId_t.Invalid ? modContainer.Contents.m_WorkshopId.ToString() : "LOCAL",
@@ -868,14 +867,14 @@ namespace ModManager
                 }
                 else
                 {
-                    logger.Error($"FAILED to fetch ModContainer for {key}");
+                    logger.Error($"❌ FAILED to fetch ModContainer for {key}");
                     if (!mods.ContainsKey(key))
                     {
-                        logger.Error($"  m_Mods missing key");
+                        logger.Error($"  ⛔ m_Mods missing key");
                     }
                     else if (modContainer == null)
                     {
-                        logger.Error("  ModContainer is NULL");
+                        logger.Error("  ❌ ModContainer is NULL");
                     }
                 }
                 processed++;
@@ -894,55 +893,55 @@ namespace ModManager
             FixedUpdateQueue.Clear();
 
             // Process the correct load order of EarlyInits
-            logger.Info("Building EarlyInit dependency graph");
+            logger.Info("🕓 Building EarlyInit dependency graph");
             EarlyInitQueue = ProcessOrder(
                 (IManagedMod mod) => { return mod.EarlyLoadBefore; },
                 (IManagedMod mod) => { return mod.EarlyLoadAfter; },
                 (WrappedMod mod) => { return mod.EarlyInitOrder; },
                 (WrappedMod mod) => { return session.m_Multiplayer || !mod.IsRemote; });
-            logger.Debug("EarlyInit Mod Queue: ");
+            logger.Debug("📑 EarlyInit Mod Queue: ");
             foreach (WrappedMod mod in EarlyInitQueue)
             {
-                logger.Debug(" - {mod}", mod.Name);
+                logger.Debug(" 🗳️ {mod}", mod.Name);
             }
 
             // Process the correct load order of Inits
-            logger.Info("Building Init dependency graph");
+            logger.Info("🕓 Building Init dependency graph");
             InitQueue = ProcessOrder(
                 (IManagedMod mod) => { return mod.LoadBefore; },
                 (IManagedMod mod) => { return mod.LoadAfter; },
                 (WrappedMod mod) => { return mod.InitOrder; },
                 (WrappedMod mod) => { return session.m_Multiplayer || !mod.IsRemote; });
-            logger.Debug("Init Mod Queue: ");
+            logger.Debug("📑 Init Mod Queue: ");
             foreach (WrappedMod mod in InitQueue)
             {
-                logger.Debug(" - {mod}", mod.Name);
+                logger.Debug(" 🗳️ {mod}", mod.Name);
             }
 
             // Process Update order
-            logger.Info("Building Update dependency graph");
+            logger.Info("🕓 Building Update dependency graph");
             UpdateQueue = ProcessOrder(
                 (IManagedMod mod) => { return mod.UpdateBefore; },
                 (IManagedMod mod) => { return mod.UpdateAfter; },
                 (WrappedMod mod) => { return mod.UpdateOrder; },
                 (WrappedMod mod) => { return mod.HasUpdate; });
-            logger.Debug("Update Mod Queue: ");
+            logger.Debug("📑 Update Mod Queue: ");
             foreach (WrappedMod mod in UpdateQueue)
             {
-                logger.Debug(" - {mod}", mod.Name);
+                logger.Debug(" 🗳️ {mod}", mod.Name);
             }
 
             // Process FixedUpdate order
-            logger.Info("Building FixedUpdate dependency graph");
+            logger.Info("🕓 Building FixedUpdate dependency graph");
             FixedUpdateQueue = ProcessOrder(
                 (IManagedMod mod) => { return mod.FixedUpdateBefore; },
                 (IManagedMod mod) => { return mod.FixedUpdateAfter; },
                 (WrappedMod mod) => { return mod.FixedUpdateOrder; },
                 (WrappedMod mod) => { return mod.HasFixedUpdate; });
-            logger.Debug("FixedUpdate Mod Queue: ");
+            logger.Debug("📑 FixedUpdate Mod Queue: ");
             foreach (WrappedMod mod in FixedUpdateQueue)
             {
-                logger.Debug(" - {mod}", mod.Name);
+                logger.Debug(" 🗳️ {mod}", mod.Name);
             }
         }
 
@@ -1019,18 +1018,18 @@ namespace ModManager
         {
             if (BlockInjector != null && LegacyBlockLoader is null)
             {
-                logger.Info("BlockInjector present, but LegacyBlockLoader is not. Injecting blocks now.");
+                logger.Info("🚨 BlockInjector present, but LegacyBlockLoader is not. Injecting blocks now.");
                 PatchedBlockInjectorInitializer();
                 RunBlockInjector();
             }
             else if (BlockInjector != null && LegacyBlockLoader != null)
             {
-                logger.Info("LegacyBlockLoader is present. It will handle block loading");
+                logger.Info("🚨 LegacyBlockLoader is present. It will handle block loading");
                 PatchedBlockInjectorInitializer();
             }
             else
             {
-                logger.Info("BlockInjector is disabled.");
+                logger.Info("✔️ BlockInjector is disabled.");
             }
         }
 
@@ -1048,12 +1047,12 @@ namespace ModManager
             {
                 try
                 {
-                    logger.Trace($"Firing Update for {script.Name}");
+                    logger.Trace($"⏳ Firing Update for '{script.Name}'");
                     script.Update();
                 }
                 catch (Exception e)
                 {
-                    logger.Error($"Failed to process Update() for {script.Name}:\n{e.ToString()}");
+                    logger.Error($"⛔ Failed to process Update() for '{script.Name}':\n{e.ToString()}");
                 }
             }
         }
@@ -1064,12 +1063,12 @@ namespace ModManager
             {
                 try
                 {
-                    logger.Trace($"Firing FixedUpdate for {script.Name}");
+                    logger.Trace($"⏳ Firing FixedUpdate for '{script.Name}'");
                     script.FixedUpdate();
                 }
                 catch (Exception e)
                 {
-                    logger.Error($"Failed to process FixedUpdate() for {script.Name}:\n{e.ToString()}");
+                    logger.Error($"⛔ Failed to process FixedUpdate() for '{script.Name}':\n{e.ToString()}");
                 }
             }
         }

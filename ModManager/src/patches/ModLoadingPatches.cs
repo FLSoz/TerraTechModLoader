@@ -12,7 +12,7 @@ namespace ModManager.patches
         [HarmonyPatch(typeof(UILoadingScreenModProgress), "Update")]
         private static class UpdateLoadingScreen
         {
-            private static bool dumped = false;
+            private static bool screenOverridden = false;
 
             // Texture2D texture, Rect rect, Vector2 pivot, float pixelsPerUnit, uint extrude, SpriteMeshType meshType, Vector4 border
             private static Sprite CloneSprite(Sprite sprite, Texture2D newTex)
@@ -44,17 +44,17 @@ namespace ModManager.patches
             [HarmonyPrefix]
             public static void Prefix(UILoadingScreenModProgress __instance)
             {
-                if (!dumped)
+                if (!screenOverridden)
                 {
 
                     ModContainer container = ModManager.ModManagerContainer;
-                    ModManager.logger.Debug("Got ModContainer");
+                    ModManager.logger.Debug("✔️ Got ModContainer");
                     ModContents contents = container.Contents;
-                    ModManager.logger.Debug("Got ModContents");
+                    ModManager.logger.Debug("🗃️ Got ModContents");
 
                     if (contents != null)
                     {
-                        dumped = true;
+                        screenOverridden = true;
                         Transform text = __instance.loadingBar.transform.GetChild(0);
                         Transform Background = __instance.loadingBar.transform.GetChild(1);
                         Transform Fill = Background.GetChild(0);
@@ -78,10 +78,10 @@ namespace ModManager.patches
                         text.localPosition = text.localPosition + 200 * Vector3.down;
                         Background.localPosition = Background.localPosition + 200 * Vector3.down;
 
-                        ModManager.logger.Debug("Got target images");
+                        ModManager.logger.Debug("🖼️ Got target images");
                         Texture2D fillTex = contents.FindAsset("fill") as Texture2D;
                         Texture2D backgroundTex = contents.FindAsset("background") as Texture2D;
-                        ModManager.logger.Debug("Got Replacement Textures");
+                        ModManager.logger.Debug("🎨 Got Replacement Textures");
 
                         Sprite newFill = CloneSprite(fill.sprite, fillTex);
                         Sprite newBackground = CloneSprite(background.sprite, backgroundTex);

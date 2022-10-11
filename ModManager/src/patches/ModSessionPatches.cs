@@ -100,13 +100,13 @@ namespace ModManager.patches
             [HarmonyPostfix]
             public static void Postfix(ModSessionInfo newSessionInfo)
             {
-                ModManager.logger.Info("Recalculating snapshot cache");
+                ModManager.logger.Info("📸 Recalculating snapshot cache");
                 IEnumerator snapshotIterator = Singleton.Manager<ManSnapshots>.inst.UpdateSnapshotCacheOnStartup();
                 while (snapshotIterator.MoveNext())
                 {
                     // iterate over snapshots
                 }
-                ModManager.logger.Info("Recalculated snapshot cache");
+                ModManager.logger.Info("🏁 Recalculated snapshot cache");
 
                 PrintSessionInfo(newSessionInfo);
             }
@@ -180,18 +180,24 @@ namespace ModManager.patches
                         {
                             KeyValuePair<string, ModContainer> pair = enumerator.Current;
                             string modID = pair.Key;
-                            bool local = pair.Value.Contents.m_WorkshopId == PublishedFileId_t.Invalid;
+                            ModContainer container = pair.Value;
+                            bool local = container.Contents == null || container.Contents.m_WorkshopId == PublishedFileId_t.Invalid;
                             // If it's multiplayer, we allow remote mods. Else, we disallow remote mods
-                            if (pair.Value.IsLoaded && !session.Mods.ContainsKey(modID) && (!session.m_Multiplayer || !local))
+                            if (container.IsLoaded && !session.Mods.ContainsKey(modID) && (!session.m_Multiplayer || !local))
                             {
-                                ModManager.logger.Debug($"Adding mod {modID} to session");
-                                session.Mods.Add(modID, pair.Value.Contents.m_WorkshopId.m_PublishedFileId);
+                                PublishedFileId_t id = PublishedFileId_t.Invalid;
+                                if (container.Contents != null)
+                                {
+                                    id = container.Contents.m_WorkshopId;
+                                }
+                                ModManager.logger.Debug($" 📦 Adding mod {modID} to session");
+                                session.Mods.Add(modID, id.m_PublishedFileId);
                             }
                         }
                         return;
                     }
                 }
-                ModManager.logger.Error("Called AutoAddModsToSession for null session");
+                ModManager.logger.Error("❌ Called AutoAddModsToSession for null session");
             }
 
             [HarmonyPrefix]
@@ -217,13 +223,13 @@ namespace ModManager.patches
                             // This normally adds all the global mods to the session. We don't bother doing this since we know the session will be the same
                             if (ModManager.CurrentSessionLoaded && (currentSession.m_Multiplayer == requestedSession.m_Multiplayer))
                             {
-                                ModManager.logger.Info("Mod session remaining the same");
+                                ModManager.logger.Info("✔️ Mod session remaining the same");
                                 ReflectedManMods.m_RequestedSession.SetValue(__instance, null);
                             }
                             else
                             {
                                 // Either we're switching to or from multiplayer, or the current session is not loaded
-                                ModManager.logger.Info("Determining mod session");
+                                ModManager.logger.Info("🕓 Determining mod session");
                                 AutoAddModsToSession(__instance, requestedSession);
                                 ReflectedManMods.m_LoadingRequestedSessionInProgress.SetValue(__instance, true);
                                 ModManager.CurrentSessionLoaded = false;
@@ -236,7 +242,7 @@ namespace ModManager.patches
                         else
                         {
                             ReflectedManMods.m_LoadingRequestedSessionInProgress.SetValue(__instance, true);
-                            ModManager.logger.Info("Switching mod session");
+                            ModManager.logger.Info("🔀 Switching mod session");
                             ModManager.CurrentSessionLoaded = false;
                             ModManager.CurrentOperation = "Purging";
                             ModManager.contentLoader.Start(currentSession, requestedSession);
@@ -298,7 +304,7 @@ namespace ModManager.patches
             [HarmonyPrefix]
             internal static void Prefix(JSONModuleLoader loader)
             {
-                ModManager.logger.Info($"Trying to register loader {loader.GetModuleKey()}");
+                ModManager.logger.Info($"🗳️ Trying to register loader {loader.GetModuleKey()}");
             }
         }
 

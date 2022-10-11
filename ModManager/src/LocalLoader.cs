@@ -19,7 +19,7 @@ namespace ModManager
 			string modPath = Path.Combine(ModManager.TTSteamDir, ManMods.LocalModsDirectory, localModName);
 			if (Directory.Exists(modPath))
 			{
-				ModManager.logger.Info("  Found mod in {ModFolder}. Resolved name as {ModName}", modPath, localModName);
+				ModManager.logger.Debug("  📁 Found mod in {ModFolder}. Resolved name as {ModName}", modPath, localModName);
 				ModContainer modContainer = new ModContainer(localModName, string.Concat(new string[]
 				{
 					modPath,
@@ -33,12 +33,12 @@ namespace ModManager
 					{
 						mods.Add(modContainer.ModID, modContainer);
 						ReflectedManMods.RequestModLoad.Invoke(manager, new object[] { modContainer.ModID });
-						ModManager.logger.Info("  Loading local mod {ModID}", modContainer.ModID);
+						ModManager.logger.Debug("  ➤ Loading local mod {ModID}", modContainer.ModID);
 					}
 					else
 					{
 						ModManager.logger.Error(
-							"Failed to register mod with ID {ModID} from folder {ModFolder}, because we already have a mod with the same ID from folder {ExistingModFolder}",
+                            "❌ Failed to register mod with ID {ModID} from folder {ModFolder}, because we already have a mod with the same ID from folder {ExistingModFolder}",
 							modContainer.ModID,
 							localModName,
 							mods[modContainer.ModID].AssetBundlePath);
@@ -46,13 +46,13 @@ namespace ModManager
 				}
 				else
 				{
-					ModManager.logger.Error("Created mod container {ModName}, but it did not correctly parse an ID", localModName);
+					ModManager.logger.Error("❌ Created mod container {ModName}, but it did not correctly parse an ID", localModName);
 				}
 				return;
 			}
 			else
 			{
-				ModManager.logger.Error("Could not find local mod {Mod} ({Actual}) at {ModPath}", sanitizedName, localModName, modPath);
+				ModManager.logger.Error("❌ Could not find local mod {Mod} ({Actual}) at {ModPath}", sanitizedName, localModName, modPath);
 			}
 		}
     }

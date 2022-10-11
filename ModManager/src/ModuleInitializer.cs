@@ -25,11 +25,11 @@ namespace ModManager
                 ModManager.PatchAssemblyLoading();
                 // TODO: Add assembly initialization logic.
                 ModManager.Patch();
-                ModManager.logger.Info("Assembly Initialization Complete");
+                Console.WriteLine("Assembly Initialization Complete");
 
                 // Allow debug settings to happen even in normal operation
                 string[] commandLineArgs = CommandLineReader.GetCommandLineArgs();
-                ModManager.logger.Info($"Running game with params: {String.Join(" ", commandLineArgs)}");
+                Console.WriteLine($"Running game with params: {String.Join(" ", commandLineArgs)}");
                 for (int i = 0; i < commandLineArgs.Length; i++)
                 {
                     if (i == 0)
@@ -61,8 +61,7 @@ namespace ModManager
                 // Patch snapshot load failure logging
                 SerializationLoggingPatches.Setup();
 
-
-                ModManager.logger.Info($"0MM version v.{ModManager.Version} initialized");
+                Console.WriteLine($"0MM version v.{ModManager.Version} initialized");
             }
         }
     }
