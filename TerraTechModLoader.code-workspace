@@ -1,0 +1,11 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"unity-tools.documentationVersion": "\"2018.4\"",
+		"omnisharp.useModernNet": false
+	}
+}

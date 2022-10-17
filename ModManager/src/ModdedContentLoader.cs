@@ -313,12 +313,14 @@ namespace ModManager
                     ModManager.InjectedEarlyHooks.SetValue(container, true);
                 }
                 ModManager.containersWithEarlyHooks.Add(container);
+                logger.Debug("  ✔️ EarlyInit success");
                 processed++;
                 ModManager.CurrentOperationProgress = (float)processed / (float)numMods;
                 yield return null;
             }
             ModManager.CurrentOperationSpecifics = null;
             yield return null;
+            yield break;
             yield break;
         }
 
@@ -355,12 +357,14 @@ namespace ModManager
                     }
                     yield return null;
                 }
+                logger.Debug("  ✔️ Init success");
                 processed++;
                 ModManager.CurrentOperationProgress = (float)processed / (float)numMods;
                 yield return null;
             }
             ModManager.CurrentOperationSpecifics = null;
             yield return null;
+            yield break;
             yield break;
         }
 
@@ -399,6 +403,7 @@ namespace ModManager
             }
             ModManager.CurrentOperationSpecifics = null;
             yield return null;
+            yield break;
             yield break;
         }
 
@@ -475,6 +480,7 @@ namespace ModManager
             ModManager.CurrentOperationSpecifics = null;
             yield return null;
             yield break;
+            yield break;
         }
 
 
@@ -510,6 +516,7 @@ namespace ModManager
                     logger.Error("   ❌ FAILED to read BlockJSON");
                     logger.Error(e);
                     yield break;
+                    yield break;
                 }
                 if (jobject != null)
                 {
@@ -541,6 +548,7 @@ namespace ModManager
                     }
                 }
             }
+            yield break;
             yield break;
         }
 
@@ -746,6 +754,8 @@ namespace ModManager
                     this.requestedSession.BlockIDs.Remove(key2);
                 }
                 logger.Info("🏁 Injected all official blocks");
+                ModManager.CurrentOperationProgress = 1.0f;
+                yield return null;
 
                 IEnumerator<float> legacyIterator = InjectLegacyBlocksIterator(this.requestedSession, gradeBlocksPerCorp, blockSpriteDict);
                 if (legacyIterator != null) {
@@ -759,6 +769,10 @@ namespace ModManager
                     }
                     logger.Info("🏁 Injected all legacy blocks");
                 }
+                ModManager.CurrentOperation = "Setting up Block Tables";
+                ModManager.CurrentOperationSpecifics = null;
+                ModManager.CurrentOperationProgress = 1.0f;
+                yield return null;
 
                 logger.Debug(" 🖼️ Setting up block icons");
                 Singleton.Manager<ManUI>.inst.m_SpriteFetcher.SetModSprites(ObjectTypes.Block, blockSpriteDict);
@@ -796,6 +810,7 @@ namespace ModManager
             }
             ModManager.CurrentOperationSpecifics = null;
             yield return null;
+            yield break;
             yield break;
         }
 
@@ -853,6 +868,7 @@ namespace ModManager
                 }
             }
             Singleton.Manager<ManTechMaterialSwap>.inst.BuildCustomCorpArrayTextures(dictionary);
+            yield break;
             yield break;
         }
     }
