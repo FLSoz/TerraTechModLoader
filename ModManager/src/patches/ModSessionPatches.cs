@@ -162,8 +162,8 @@ namespace ModManager.patches
                 ModManager.ProcessEarlyInits();
                 ModManager.ProcessInits();
                 ModManager.logger.Info("InitModScripts End");
-                */
                 return false;
+                */
             }
         }
 

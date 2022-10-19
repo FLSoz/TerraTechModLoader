@@ -542,10 +542,10 @@ namespace ModManager
             if (dependencies.HasCycles())
             {
                 logger.Error(" 🚨 CIRCULAR DEPENDENCY DETECTED! See ModManager.log for details");
-                throw new Exception("CIRCULAR DEPENDENCY FOUND");
                 List<List<int>> cycles = dependencies.FindCycles();
                 dependencies.PrintCycles(LogLevel.Debug, cycles);
                 dependencies.ResolveCycles(cycles);
+                throw new Exception("CIRCULAR DEPENDENCY FOUND");
             }
 
             // Sort into an ordered list
