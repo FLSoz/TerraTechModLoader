@@ -318,9 +318,9 @@ namespace ModManager
                 ModManager.CurrentOperationProgress = (float)processed / (float)numMods;
                 yield return null;
             }
+
             ModManager.CurrentOperationSpecifics = null;
             yield return null;
-            yield break;
             yield break;
         }
 
@@ -362,9 +362,9 @@ namespace ModManager
                 ModManager.CurrentOperationProgress = (float)processed / (float)numMods;
                 yield return null;
             }
+
             ModManager.CurrentOperationSpecifics = null;
             yield return null;
-            yield break;
             yield break;
         }
 
@@ -401,9 +401,9 @@ namespace ModManager
                 }
                 Singleton.Manager<ManLicenses>.inst.m_UnlockTable.AddModdedCorps(dictionary);
             }
+
             ModManager.CurrentOperationSpecifics = null;
             yield return null;
-            yield break;
             yield break;
         }
 
@@ -477,9 +477,9 @@ namespace ModManager
             {
                 yield return null;
             }
+
             ModManager.CurrentOperationSpecifics = null;
             yield return null;
-            yield break;
             yield break;
         }
 
@@ -516,8 +516,8 @@ namespace ModManager
                     logger.Error("   ❌ FAILED to read BlockJSON");
                     logger.Error(e);
                     yield break;
-                    yield break;
                 }
+
                 if (jobject != null)
                 {
                     Dictionary<string, JSONModuleLoader> loaders = (Dictionary<string, JSONModuleLoader>)sLoaders.GetValue(null);
@@ -548,7 +548,7 @@ namespace ModManager
                     }
                 }
             }
-            yield break;
+
             yield break;
         }
 
@@ -808,9 +808,9 @@ namespace ModManager
                 logger.Trace($" 🟢 Initing table");
                 blockUnlockTable.Init();
             }
+
             ModManager.CurrentOperationSpecifics = null;
             yield return null;
-            yield break;
             yield break;
         }
 
@@ -867,8 +867,8 @@ namespace ModManager
                     dictionary.Add(keyValuePair.Key, moddedSkins);
                 }
             }
+
             Singleton.Manager<ManTechMaterialSwap>.inst.BuildCustomCorpArrayTextures(dictionary);
-            yield break;
             yield break;
         }
     }
