@@ -563,6 +563,9 @@ namespace ModManager
             Dictionary<int, Sprite> blockSpriteDict
         )
         {
+            // Adding trace logs to this method somehow fixes an "Unhandled NULL" crash on Linux.
+            logger.Trace("InjectLegacyBlocksIterator()");
+            logger.Trace($"newSessionInfo: {newSessionInfo}, gradeBlockPerCorp: {gradeBlockPerCorp}, blockSpriteDict: {blockSpriteDict}");
             return null;
         }
 
