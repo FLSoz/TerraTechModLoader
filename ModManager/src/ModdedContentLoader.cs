@@ -505,10 +505,12 @@ namespace ModManager
                             logger.Info("Block " + def.name + " could not find a JSON override at " + text);
                         }
                     }
+
                     if (jobject == null)
                     {
                         jobject = JObject.Parse(def.m_Json.text);
                         logger.Trace("   ✔️ Read JSON from asset bundle for " + def.name);
+                        yield break;
                     }
                 }
                 catch (Exception e)
@@ -518,34 +520,37 @@ namespace ModManager
                     yield break;
                 }
 
-                if (jobject != null)
+                if (jobject == null)
                 {
-                    Dictionary<string, JSONModuleLoader> loaders = (Dictionary<string, JSONModuleLoader>)sLoaders.GetValue(null);
-                    foreach (KeyValuePair<string, JToken> keyValuePair in jobject)
+                    yield break;
+                }
+
+                Dictionary<string, JSONModuleLoader> loaders = (Dictionary<string, JSONModuleLoader>)sLoaders.GetValue(null);
+                foreach (KeyValuePair<string, JToken> keyValuePair in jobject)
+                {
+                    JSONModuleLoader jsonmoduleLoader;
+                    if (loaders.TryGetValue(keyValuePair.Key, out jsonmoduleLoader))
                     {
-                        JSONModuleLoader jsonmoduleLoader;
-                        if (loaders.TryGetValue(keyValuePair.Key, out jsonmoduleLoader))
+                        try
                         {
-                            try
+                            logger.Trace($"   💿 Processing Loader {keyValuePair.Key}");
+                            if (!jsonmoduleLoader.CreateModuleForBlock(blockID, def, block, keyValuePair.Value))
                             {
-                                logger.Trace($"   💿 Processing Loader {keyValuePair.Key}");
-                                if (!jsonmoduleLoader.CreateModuleForBlock(blockID, def, block, keyValuePair.Value))
-                                {
-                                    logger.Error(string.Format("   ❌ Failed to parse module {0} in JSON for {1}", keyValuePair.Key, def));
-                                }
-                            }
-                            catch (Exception e)
-                            {
-                                logger.Error($"   ❌ FAILED to process block module {keyValuePair.Key}");
-                                logger.Error(e);
+                                logger.Error(string.Format("   ❌ Failed to parse module {0} in JSON for {1}", keyValuePair.Key, def));
                             }
                         }
-                        else
+                        catch (Exception e)
                         {
-                            logger.Error(string.Format("   ❌ Could not parse module {0} in JSON for {1}", keyValuePair.Key, def));
+                            logger.Error($"   ❌ FAILED to process block module {keyValuePair.Key}");
+                            logger.Error(e);
                         }
-                        yield return null;
                     }
+                    else
+                    {
+                        logger.Error(string.Format("   ❌ Could not parse module {0} in JSON for {1}", keyValuePair.Key, def));
+                    }
+
+                    yield return null;
                 }
             }
 
@@ -753,6 +758,7 @@ namespace ModManager
                 {
                     this.requestedSession.BlockIDs.Remove(key2);
                 }
+
                 logger.Info("🏁 Injected all official blocks");
                 ModManager.CurrentOperationProgress = 1.0f;
                 yield return null;
@@ -769,6 +775,7 @@ namespace ModManager
                     }
                     logger.Info("🏁 Injected all legacy blocks");
                 }
+
                 ModManager.CurrentOperation = "Setting up Block Tables";
                 ModManager.CurrentOperationSpecifics = null;
                 ModManager.CurrentOperationProgress = 1.0f;
