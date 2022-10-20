@@ -71,6 +71,7 @@ namespace ModManager
 
             FieldInfo _LoadOrder = AccessTools.Field(mod, "LoadOrder");
             FieldInfo _InitOrder = AccessTools.Field(mod, "InitOrder");
+            FieldInfo _EarlyInitOrder = AccessTools.Field(mod, "EarlyInitOrder");
 
             MethodInfo _GetLoadAfter = AccessTools.Method(mod, "LoadAfter");
             MethodInfo _GetLoadBefore = AccessTools.Method(mod, "LoadBefore");
@@ -91,6 +92,7 @@ namespace ModManager
             managedMod.Instance = instance;
             managedMod.instanceType = mod;
 
+            // setup InitOrder
             if (_InitOrder != null)
             {
                 managedMod._InitOrder = (int)_InitOrder.GetValue(null);
@@ -102,6 +104,20 @@ namespace ModManager
             else
             {
                 managedMod._InitOrder = ModManager.DEFAULT_LOAD_ORDER;
+            }
+
+            // setup EarlyInitOrder
+            if (_EarlyInitOrder != null)
+            {
+                managedMod._EarlyInitOrder = (int)_EarlyInitOrder.GetValue(null);
+            }
+            else if (_LoadOrder != null)
+            {
+                managedMod._EarlyInitOrder = (int)_LoadOrder.GetValue(null);
+            }
+            else
+            {
+                managedMod._EarlyInitOrder = ModManager.DEFAULT_LOAD_ORDER;
             }
 
             managedMod._GetLoadAfter = _GetLoadAfter;
@@ -150,20 +166,6 @@ namespace ModManager
                 managedMod._ManagedEarlyInit = _ManagedEarlyInit;
                 managedMod._GetEarlyLoadAfter = AccessTools.Method(mod, "EarlyLoadAfter");
                 managedMod._GetEarlyLoadBefore = AccessTools.Method(mod, "EarlyLoadBefore");
-
-                FieldInfo _EarlyInitOrder = AccessTools.Field(mod, "EarlyInitOrder");
-                if (_EarlyInitOrder != null)
-                {
-                    managedMod._EarlyInitOrder = (int)_EarlyInitOrder.GetValue(null);
-                }
-                else if (_LoadOrder != null)
-                {
-                    managedMod._EarlyInitOrder = (int)_LoadOrder.GetValue(null);
-                }
-                else
-                {
-                    managedMod._EarlyInitOrder = ModManager.DEFAULT_LOAD_ORDER;
-                }
             }
 
             managedMod._ManagedIteratorInit = _ManagedIteratorInit;

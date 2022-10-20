@@ -552,15 +552,6 @@ namespace ModManager
             yield break;
         }
 
-        private static IEnumerator<float> InjectLegacyBlocksIterator(
-            ModSessionInfo newSessionInfo,
-            Dictionary<int, Dictionary<int, Dictionary<BlockTypes, ModdedBlockDefinition>>> gradeBlockPerCorp,
-            Dictionary<int, Sprite> blockSpriteDict
-        )
-        {
-            return null;
-        }
-
         private IEnumerator InjectModdedBlocks()
         {
             // Process the Inits
@@ -757,18 +748,6 @@ namespace ModManager
                 ModManager.CurrentOperationProgress = 1.0f;
                 yield return null;
 
-                IEnumerator<float> legacyIterator = InjectLegacyBlocksIterator(this.requestedSession, gradeBlocksPerCorp, blockSpriteDict);
-                if (legacyIterator != null) {
-                    ModManager.CurrentOperation = "Injecting legacy modded blocks";
-                    logger.Info("⏳ Injecting Legacy Modded Blocks");
-                    while (legacyIterator.MoveNext())
-                    {
-                        float progress = legacyIterator.Current;
-                        ModManager.CurrentOperationProgress = progress;
-                        yield return null;
-                    }
-                    logger.Info("🏁 Injected all legacy blocks");
-                }
                 ModManager.CurrentOperation = "Setting up Block Tables";
                 ModManager.CurrentOperationSpecifics = null;
                 ModManager.CurrentOperationProgress = 1.0f;
