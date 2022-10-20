@@ -485,76 +485,84 @@ namespace ModManager
 
 
         private static FieldInfo sLoaders = AccessTools.Field(typeof(JSONBlockLoader), "sLoaders");
+        
         private static IEnumerator LoadBlockJSON(ModContainer mod, int blockID, ModdedBlockDefinition def, TankBlock block)
         {
-            if (def != null)
+            if (def == null)
             {
-                JObject jobject = null;
-                try
-                {
-                    if (Singleton.Manager<ManMods>.inst.ShouldReadFromRawJSON)
-                    {
-                        string text = mod.AssetBundlePath.Substring(0, mod.AssetBundlePath.LastIndexOf('/')) + "/BlockJSON/" + def.name + ".json";
-                        if (File.Exists(text))
-                        {
-                            jobject = JObject.Parse(File.ReadAllText(text));
-                            logger.Info("⚠️ Read JSON from " + text + " as an override");
-                        }
-                        else
-                        {
-                            logger.Info("Block " + def.name + " could not find a JSON override at " + text);
-                        }
-                    }
+                yield break;
+            }
 
-                    if (jobject == null)
-                    {
-                        jobject = JObject.Parse(def.m_Json.text);
-                        logger.Trace("   ✔️ Read JSON from asset bundle for " + def.name);
-                        yield break;
-                    }
-                }
-                catch (Exception e)
+            if (block == null)
+            {
+                yield break;
+            }
+
+
+            JObject jobject = null;
+            try
+            {
+                if (Singleton.Manager<ManMods>.inst.ShouldReadFromRawJSON)
                 {
-                    logger.Error("   ❌ FAILED to read BlockJSON");
-                    logger.Error(e);
-                    yield break;
+                    string text = mod.AssetBundlePath.Substring(0, mod.AssetBundlePath.LastIndexOf('/')) + "/BlockJSON/" + def.name + ".json";
+                    if (File.Exists(text))
+                    {
+                        jobject = JObject.Parse(File.ReadAllText(text));
+                        logger.Info("⚠️ Read JSON from " + text + " as an override");
+                    }
+                    else
+                    {
+                        logger.Info("Block " + def.name + " could not find a JSON override at " + text);
+                    }
                 }
 
                 if (jobject == null)
                 {
+                    jobject = JObject.Parse(def.m_Json.text);
+                    logger.Trace("   ✔️ Read JSON from asset bundle for " + def.name);
+                }
+            }
+            catch (Exception e)
+            {
+                logger.Error("   ❌ FAILED to read BlockJSON");
+                logger.Error(e);
+                yield break;
+            }
+
+            if (jobject == null)
+            {
+                yield break;
+            }
+
+            Dictionary<string, JSONModuleLoader> loaders = (Dictionary<string, JSONModuleLoader>)sLoaders.GetValue(null);
+            foreach (KeyValuePair<string, JToken> keyValuePair in jobject)
+            {
+                JSONModuleLoader jsonmoduleLoader;
+                if (loaders.TryGetValue(keyValuePair.Key, out jsonmoduleLoader))
+                {
+                    try
+                    {
+                        logger.Trace($"   💿 Processing Loader {keyValuePair.Key}");
+                        if (!jsonmoduleLoader.CreateModuleForBlock(blockID, def, block, keyValuePair.Value))
+                        {
+                            logger.Error(string.Format("   ❌ Failed to parse module {0} in JSON for {1}", keyValuePair.Key, def));
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.Error($"   ❌ FAILED to process block module {keyValuePair.Key}");
+                        logger.Error(ex);
+                        yield break;
+                    }
+                }
+                else
+                {
+                    logger.Error(string.Format("   ❌ Could not parse module {0} in JSON for {1}", keyValuePair.Key, def));
                     yield break;
                 }
 
-                Dictionary<string, JSONModuleLoader> loaders = (Dictionary<string, JSONModuleLoader>)sLoaders.GetValue(null);
-                foreach (KeyValuePair<string, JToken> keyValuePair in jobject)
-                {
-                    JSONModuleLoader jsonmoduleLoader;
-                    if (loaders.TryGetValue(keyValuePair.Key, out jsonmoduleLoader))
-                    {
-                        try
-                        {
-                            logger.Trace($"   💿 Processing Loader {keyValuePair.Key}");
-                            if (!jsonmoduleLoader.CreateModuleForBlock(blockID, def, block, keyValuePair.Value))
-                            {
-                                logger.Error(string.Format("   ❌ Failed to parse module {0} in JSON for {1}", keyValuePair.Key, def));
-                            }
-                        }
-                        catch (Exception e)
-                        {
-                            logger.Error($"   ❌ FAILED to process block module {keyValuePair.Key}");
-                            logger.Error(e);
-                        }
-                    }
-                    else
-                    {
-                        logger.Error(string.Format("   ❌ Could not parse module {0} in JSON for {1}", keyValuePair.Key, def));
-                    }
-
-                    yield return null;
-                }
+                yield return null;
             }
-
-            yield break;
         }
 
         private static IEnumerator<float> InjectLegacyBlocksIterator(
@@ -568,195 +576,215 @@ namespace ModManager
             logger.Trace($"newSessionInfo: {newSessionInfo}, gradeBlockPerCorp: {gradeBlockPerCorp}, blockSpriteDict: {blockSpriteDict}");
             return null;
         }
-
+        
         private IEnumerator InjectModdedBlocks()
         {
-            // Process the Inits
+            // Process the inits.
             logger.Info("⏳ Injecting Modded Blocks");
             ModManager.CurrentOperation = "Injecting modded blocks";
-            if (this.requestedSession.BlockIDs.Count > 0)
+
+            // If there aren't any blocks to process, stop.
+            int numBlocks = this.requestedSession.BlockIDs.Count;
+            if (numBlocks <= 0)
             {
-                int processed = 0;
-                int numBlocks = this.requestedSession.BlockIDs.Count;
-                Dictionary<int, Dictionary<int, Dictionary<BlockTypes, ModdedBlockDefinition>>> gradeBlocksPerCorp = new Dictionary<int, Dictionary<int, Dictionary<BlockTypes, ModdedBlockDefinition>>>();
-                Dictionary<int, Sprite> blockSpriteDict = new Dictionary<int, Sprite>(16);
-                Dictionary<int, string> blockNames = (Dictionary<int, string>)ReflectedManMods.m_BlockNames.GetValue(manMods);
-                Dictionary<int, string> blockDescriptions = (Dictionary<int, string>)ReflectedManMods.m_BlockDescriptions.GetValue(manMods);
-                Dictionary<string, int> reverseLookup = (Dictionary<string, int>)ReflectedManMods.m_BlockIDReverseLookup.GetValue(manMods);
-                List<int> failedBlockIDs = new List<int>();
-                foreach (KeyValuePair<int, string> blockPair in this.requestedSession.BlockIDs)
+                ModManager.CurrentOperationSpecifics = null;
+                yield break;
+            }
+
+            int processed = 0;
+            Dictionary<int, Dictionary<int, Dictionary<BlockTypes, ModdedBlockDefinition>>> gradeBlocksPerCorp = new Dictionary<int, Dictionary<int, Dictionary<BlockTypes, ModdedBlockDefinition>>>();
+            Dictionary<int, Sprite> blockSpriteDict = new Dictionary<int, Sprite>(16);
+            Dictionary<int, string> blockNames = (Dictionary<int, string>)ReflectedManMods.m_BlockNames.GetValue(manMods);
+            Dictionary<int, string> blockDescriptions = (Dictionary<int, string>)ReflectedManMods.m_BlockDescriptions.GetValue(manMods);
+            Dictionary<string, int> reverseLookup = (Dictionary<string, int>)ReflectedManMods.m_BlockIDReverseLookup.GetValue(manMods);
+            List<int> failedBlockIDs = new List<int>();
+
+            foreach (KeyValuePair<int, string> blockPair in this.requestedSession.BlockIDs)
+            {
+                int blockIndex = blockPair.Key;
+                string blockID = blockPair.Value;
+                ModManager.CurrentOperationSpecifics = $"{blockID}";
+                ModManager.CurrentOperationProgress = (float)processed / (float)numBlocks;
+                logger.Debug($" 💉 Preparing to inject {blockID} (processed # {processed})");
+                ModdedBlockDefinition moddedBlockDefinition = manMods.FindModdedAsset<ModdedBlockDefinition>(blockID);
+                ModContainer mod = null;
+                string modId;
+                string text;
+
+                if (ModUtils.SplitCompoundId(blockID, out modId, out text))
                 {
-                    int blockIndex = blockPair.Key;
-                    string blockID = blockPair.Value;
-                    ModManager.CurrentOperationSpecifics = $"{blockID}";
-                    ModManager.CurrentOperationProgress = (float)processed / (float)numBlocks;
-                    logger.Debug($" 💉 Preparing to inject {blockID} (processed # {processed})");
-                    ModdedBlockDefinition moddedBlockDefinition = manMods.FindModdedAsset<ModdedBlockDefinition>(blockID);
-                    ModContainer mod = null;
-                    string modId;
-                    string text;
-                    if (ModUtils.SplitCompoundId(blockID, out modId, out text))
+                    mod = manMods.FindMod(modId);
+                }
+
+                if (moddedBlockDefinition == null)
+                {
+                    logger.Error(" ❌ Could not find ModdedBlockDefinition for {block}", blockID);
+                    failedBlockIDs.Add(blockIndex);
+                    processed++;
+                    continue;
+                }
+
+                int hashCode = ItemTypeInfo.GetHashCode(ObjectTypes.Block, blockIndex);
+                FactionSubTypes corpIndex = manMods.GetCorpIndex(moddedBlockDefinition.m_Corporation, this.requestedSession);
+                TankBlockTemplate physicalPrefab = moddedBlockDefinition.m_PhysicalPrefab;
+                Visible visible = physicalPrefab.GetComponent<Visible>();
+
+                if (visible == null)
+                {
+                    TankBlock tankBlock = null;
+                    ModuleDamage moduleDamage = null;
+
+                    try
                     {
-                        mod = manMods.FindMod(modId);
-                    }
-                    if (moddedBlockDefinition != null)
-                    {
-                        int hashCode = ItemTypeInfo.GetHashCode(ObjectTypes.Block, blockIndex);
-                        FactionSubTypes corpIndex = manMods.GetCorpIndex(moddedBlockDefinition.m_Corporation, this.requestedSession);
-                        TankBlockTemplate physicalPrefab = moddedBlockDefinition.m_PhysicalPrefab;
-                        Visible visible = physicalPrefab.GetComponent<Visible>();
+                        logger.Trace("  🎯 Injected block {block} and performed first time setup", moddedBlockDefinition.name);
                         if (visible == null)
                         {
-                            TankBlock tankBlock = null;
-                            ModuleDamage moduleDamage = null;
-                            try
-                            {
-                                logger.Trace("  🎯 Injected block {block} and performed first time setup", moddedBlockDefinition.name);
-                                if (visible == null)
-                                {
-                                    visible = physicalPrefab.gameObject.AddComponent<Visible>();
-                                }
-                                UnityEngine.Object component = physicalPrefab.gameObject.GetComponent<Damageable>();
-                                moduleDamage = physicalPrefab.gameObject.GetComponent<ModuleDamage>();
-                                if (component == null)
-                                {
-                                    physicalPrefab.gameObject.AddComponent<Damageable>();
-                                }
-                                if (moduleDamage == null)
-                                {
-                                    moduleDamage = physicalPrefab.gameObject.AddComponent<ModuleDamage>();
-                                }
-                                tankBlock = physicalPrefab.gameObject.GetComponent<TankBlock>();
-                                tankBlock.m_BlockCategory = moddedBlockDefinition.m_Category;
-                                tankBlock.m_BlockRarity = moddedBlockDefinition.m_Rarity;
-                                tankBlock.m_DefaultMass = Mathf.Clamp(moddedBlockDefinition.m_Mass, 0.0001f, float.MaxValue);
-                                tankBlock.filledCells = physicalPrefab.filledCells.ToArray();
-                                tankBlock.attachPoints = physicalPrefab.attachPoints.ToArray();
-                                visible.m_ItemType = new ItemTypeInfo(ObjectTypes.Block, blockIndex);
-                            }
-                            catch (Exception e)
-                            {
-                                logger.Error("  ❌ FAILED block setup for " + blockID);
-                                logger.Error(e);
-                                failedBlockIDs.Add(blockIndex);
-                                processed++;
-                                continue;
-                            }
-
-                            logger.Trace("  📜 Preparing to load block JSON");
-                            IEnumerator jsonIterator = LoadBlockJSON(mod, blockIndex, moddedBlockDefinition, tankBlock);
-                            while (jsonIterator.MoveNext())
-                            {
-                                yield return null;
-                            }
-                            logger.Trace("  ✔️ Block JSON loaded");
-                            try
-                            {
-                                physicalPrefab = moddedBlockDefinition.m_PhysicalPrefab;
-                                physicalPrefab.gameObject.SetActive(false);
-                                Damageable component3 = physicalPrefab.GetComponent<Damageable>();
-                                moduleDamage = physicalPrefab.GetComponent<ModuleDamage>();
-                                tankBlock = physicalPrefab.GetComponent<TankBlock>();
-                                visible = physicalPrefab.GetComponent<Visible>();
-                                visible.m_ItemType = new ItemTypeInfo(ObjectTypes.Block, blockIndex);
-                                component3.m_DamageableType = moddedBlockDefinition.m_DamageableType;
-                                moduleDamage.maxHealth = moddedBlockDefinition.m_MaxHealth;
-                                if (moduleDamage.deathExplosion == null)
-                                {
-                                    logger.Trace("  💥 Adding default DeathExplosion");
-                                    moduleDamage.deathExplosion = manMods.m_DefaultBlockExplosion;
-                                }
-                                foreach (MeshRenderer meshRenderer in physicalPrefab.GetComponentsInChildren<MeshRenderer>())
-                                {
-                                    MeshRendererTemplate component4 = meshRenderer.GetComponent<MeshRendererTemplate>();
-                                    if (component4 != null)
-                                    {
-                                        meshRenderer.sharedMaterial = manMods.GetMaterial((int)corpIndex, component4.slot);
-                                        d.Assert(meshRenderer.sharedMaterial != null, "[Mods] Custom block " + moddedBlockDefinition.m_BlockDisplayName + " could not load texture. Corp was " + moddedBlockDefinition.m_Corporation);
-                                    }
-                                }
-                                physicalPrefab.gameObject.name = moddedBlockDefinition.name;
-                                physicalPrefab.gameObject.tag = "Untagged";
-                                physicalPrefab.gameObject.layer = LayerMask.NameToLayer("Tank");
-                                MeshCollider[] componentsInChildren2 = tankBlock.GetComponentsInChildren<MeshCollider>();
-                                for (int i = 0; i < componentsInChildren2.Length; i++)
-                                {
-                                    componentsInChildren2[i].convex = true;
-                                }
-                            }
-                            catch (Exception e)
-                            {
-                                logger.Error("  ❌ FAILED block finalization " + blockID);
-                                logger.Error(e);
-                                failedBlockIDs.Add(blockIndex);
-                                processed++;
-                                continue;
-                            }
-
-                            logger.Trace("  🛠️ Creating component pool");
-                            tankBlock.transform.CreatePool(8);
+                            visible = physicalPrefab.gameObject.AddComponent<Visible>();
                         }
-                        else
+
+                        UnityEngine.Object component = physicalPrefab.gameObject.GetComponent<Damageable>();
+                        moduleDamage = physicalPrefab.gameObject.GetComponent<ModuleDamage>();
+                        if (component == null)
                         {
-                            physicalPrefab.gameObject.GetComponent<Visible>().m_ItemType = new ItemTypeInfo(ObjectTypes.Block, blockIndex);
-
-                            logger.Trace(" 🛠️ Updating component pool");
-                            physicalPrefab.transform.CreatePool(8);
+                            physicalPrefab.gameObject.AddComponent<Damageable>();
                         }
 
-                        ModManager.CurrentOperationSpecifics = moddedBlockDefinition.m_BlockDisplayName;
-
-                        try
+                        if (moduleDamage == null)
                         {
-                            blockNames.Add(blockIndex, moddedBlockDefinition.m_BlockDisplayName);
-                            blockDescriptions.Add(blockIndex, moddedBlockDefinition.m_BlockDescription);
-                            reverseLookup.Add(moddedBlockDefinition.name, blockIndex);
-                            Singleton.Manager<ManSpawn>.inst.AddBlockToDictionary(physicalPrefab.gameObject, blockIndex);
-                            Singleton.Manager<ManSpawn>.inst.VisibleTypeInfo.SetDescriptor<FactionSubTypes>(hashCode, corpIndex);
-                            Singleton.Manager<ManSpawn>.inst.VisibleTypeInfo.SetDescriptor<BlockCategories>(hashCode, moddedBlockDefinition.m_Category);
-                            Singleton.Manager<ManSpawn>.inst.VisibleTypeInfo.SetDescriptor<BlockRarity>(hashCode, moddedBlockDefinition.m_Rarity);
-                            Singleton.Manager<RecipeManager>.inst.RegisterCustomBlockRecipe(blockIndex, moddedBlockDefinition.m_Price);
-                            if (moddedBlockDefinition.m_Icon != null)
-                            {
-                                blockSpriteDict[blockIndex] = Sprite.Create(moddedBlockDefinition.m_Icon, new Rect(0f, 0f, (float)moddedBlockDefinition.m_Icon.width, (float)moddedBlockDefinition.m_Icon.height), Vector2.zero);
-                            }
-                            else
-                            {
-                                logger.Error($" ❌ Block {{block}} with ID {blockIndex} failed to inject because icon was not set", moddedBlockDefinition.name);
-                            }
-                            if (!gradeBlocksPerCorp.ContainsKey((int)corpIndex))
-                            {
-                                gradeBlocksPerCorp[(int)corpIndex] = new Dictionary<int, Dictionary<BlockTypes, ModdedBlockDefinition>>();
-                            }
-                            Dictionary<int, Dictionary<BlockTypes, ModdedBlockDefinition>> blockDictPerGrade = gradeBlocksPerCorp[(int)corpIndex];
-                            if (!blockDictPerGrade.ContainsKey(moddedBlockDefinition.m_Grade - 1))
-                            {
-                                blockDictPerGrade[moddedBlockDefinition.m_Grade - 1] = new Dictionary<BlockTypes, ModdedBlockDefinition>();
-                            }
-                            blockDictPerGrade[moddedBlockDefinition.m_Grade - 1].Add((BlockTypes)blockIndex, moddedBlockDefinition);
-                            JSONBlockLoader.Inject(blockIndex, moddedBlockDefinition);
-                            logger.Debug($" ✔️ Injected block {{block}} at ID {blockIndex}", moddedBlockDefinition.name);
+                            moduleDamage = physicalPrefab.gameObject.AddComponent<ModuleDamage>();
                         }
-                        catch (Exception e)
+
+                        tankBlock = physicalPrefab.gameObject.GetComponent<TankBlock>();
+                        tankBlock.m_BlockCategory = moddedBlockDefinition.m_Category;
+                        tankBlock.m_BlockRarity = moddedBlockDefinition.m_Rarity;
+                        tankBlock.m_DefaultMass = Mathf.Clamp(moddedBlockDefinition.m_Mass, 0.0001f, float.MaxValue);
+                        tankBlock.filledCells = physicalPrefab.filledCells.ToArray();
+                        tankBlock.attachPoints = physicalPrefab.attachPoints.ToArray();
+                        visible.m_ItemType = new ItemTypeInfo(ObjectTypes.Block, blockIndex);
+                    } catch(Exception ex)
+                    {
+                        logger.Error("  ❌ FAILED block setup for " + blockID);
+                        logger.Error(ex);
+                        failedBlockIDs.Add(blockIndex);
+                        processed++;
+                        continue;
+                    }
+
+                    logger.Trace("  📜 Preparing to load block JSON");
+                    
+                    IEnumerator jsonIterator = LoadBlockJSON(mod, blockIndex, moddedBlockDefinition, tankBlock);
+                    while (jsonIterator.MoveNext())
+                    {
+                        logger.Trace("LoadBlockJSON MoveNext()");
+                        yield return null;
+                    }
+
+                    logger.Trace("  ✔️ Block JSON loaded");
+
+                    try
+                    {
+                        physicalPrefab = moddedBlockDefinition.m_PhysicalPrefab;
+                        physicalPrefab.gameObject.SetActive(false);
+                        Damageable component3 = physicalPrefab.GetComponent<Damageable>();
+                        moduleDamage = physicalPrefab.GetComponent<ModuleDamage>();
+                        tankBlock = physicalPrefab.GetComponent<TankBlock>();
+                        visible = physicalPrefab.GetComponent<Visible>();
+                        visible.m_ItemType = new ItemTypeInfo(ObjectTypes.Block, blockIndex);
+                        component3.m_DamageableType = moddedBlockDefinition.m_DamageableType;
+                        moduleDamage.maxHealth = moddedBlockDefinition.m_MaxHealth;
+                        if (moduleDamage.deathExplosion == null)
                         {
-                            logger.Error(" ❌ FAILED block injection " + blockID);
-                            logger.Error(e);
-                            failedBlockIDs.Add(blockIndex);
-                            processed++;
-                            continue;
+                            logger.Trace("  💥 Adding default DeathExplosion");
+                            moduleDamage.deathExplosion = manMods.m_DefaultBlockExplosion;
                         }
+
+                        foreach (MeshRenderer meshRenderer in physicalPrefab.GetComponentsInChildren<MeshRenderer>())
+                        {
+                            MeshRendererTemplate component4 = meshRenderer.GetComponent<MeshRendererTemplate>();
+                            if (component4 != null)
+                            {
+                                meshRenderer.sharedMaterial = manMods.GetMaterial((int)corpIndex, component4.slot);
+                                d.Assert(meshRenderer.sharedMaterial != null, "[Mods] Custom block " + moddedBlockDefinition.m_BlockDisplayName + " could not load texture. Corp was " + moddedBlockDefinition.m_Corporation);
+                            }
+                        }
+
+                        physicalPrefab.gameObject.name = moddedBlockDefinition.name;
+                        physicalPrefab.gameObject.tag = "Untagged";
+                        physicalPrefab.gameObject.layer = LayerMask.NameToLayer("Tank");
+                        MeshCollider[] componentsInChildren2 = tankBlock.GetComponentsInChildren<MeshCollider>();
+                        for (int i = 0; i < componentsInChildren2.Length; i++)
+                        {
+                            componentsInChildren2[i].convex = true;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.Error("  ❌ FAILED block finalization " + blockID);
+                        logger.Error(ex);
+                        failedBlockIDs.Add(blockIndex);
+                        processed++;
+                        continue;
+                    }
+
+                    logger.Trace("  🛠️ Creating component pool");
+                    tankBlock.transform.CreatePool(8);
+                }
+                else
+                {
+                    physicalPrefab.gameObject.GetComponent<Visible>().m_ItemType = new ItemTypeInfo(ObjectTypes.Block, blockIndex);
+
+                    logger.Trace(" 🛠️ Updating component pool");
+                    physicalPrefab.transform.CreatePool(8);
+                }
+
+                ModManager.CurrentOperationSpecifics = moddedBlockDefinition.m_BlockDisplayName;
+
+                try
+                {
+                    blockNames.Add(blockIndex, moddedBlockDefinition.m_BlockDisplayName);
+                    blockDescriptions.Add(blockIndex, moddedBlockDefinition.m_BlockDescription);
+                    reverseLookup.Add(moddedBlockDefinition.name, blockIndex);
+                    Singleton.Manager<ManSpawn>.inst.AddBlockToDictionary(physicalPrefab.gameObject, blockIndex);
+                    Singleton.Manager<ManSpawn>.inst.VisibleTypeInfo.SetDescriptor<FactionSubTypes>(hashCode, corpIndex);
+                    Singleton.Manager<ManSpawn>.inst.VisibleTypeInfo.SetDescriptor<BlockCategories>(hashCode, moddedBlockDefinition.m_Category);
+                    Singleton.Manager<ManSpawn>.inst.VisibleTypeInfo.SetDescriptor<BlockRarity>(hashCode, moddedBlockDefinition.m_Rarity);
+                    Singleton.Manager<RecipeManager>.inst.RegisterCustomBlockRecipe(blockIndex, moddedBlockDefinition.m_Price);
+                    if (moddedBlockDefinition.m_Icon != null)
+                    {
+                        blockSpriteDict[blockIndex] = Sprite.Create(moddedBlockDefinition.m_Icon, new Rect(0f, 0f, (float)moddedBlockDefinition.m_Icon.width, (float)moddedBlockDefinition.m_Icon.height), Vector2.zero);
                     }
                     else
                     {
-                        logger.Error(" ❌ Could not find ModdedBlockDefinition for {block}", blockID);
-                        failedBlockIDs.Add(blockIndex);
+                        logger.Error($" ❌ Block {{block}} with ID {blockIndex} failed to inject because icon was not set", moddedBlockDefinition.name);
                     }
+                    if (!gradeBlocksPerCorp.ContainsKey((int)corpIndex))
+                    {
+                        gradeBlocksPerCorp[(int)corpIndex] = new Dictionary<int, Dictionary<BlockTypes, ModdedBlockDefinition>>();
+                    }
+                    Dictionary<int, Dictionary<BlockTypes, ModdedBlockDefinition>> blockDictPerGrade = gradeBlocksPerCorp[(int)corpIndex];
+                    if (!blockDictPerGrade.ContainsKey(moddedBlockDefinition.m_Grade - 1))
+                    {
+                        blockDictPerGrade[moddedBlockDefinition.m_Grade - 1] = new Dictionary<BlockTypes, ModdedBlockDefinition>();
+                    }
+                    blockDictPerGrade[moddedBlockDefinition.m_Grade - 1].Add((BlockTypes)blockIndex, moddedBlockDefinition);
+                    JSONBlockLoader.Inject(blockIndex, moddedBlockDefinition);
+                    logger.Debug($" ✔️ Injected block {{block}} at ID {blockIndex}", moddedBlockDefinition.name);
                     processed++;
                 }
+                catch (Exception e)
+                {
+                    logger.Error(" ❌ FAILED block injection " + blockID);
+                    logger.Error(e);
+                    failedBlockIDs.Add(blockIndex);
+                    processed++;
+                    continue;
+                }
+
                 if (failedBlockIDs.Count > 0)
                 {
                     logger.Debug(" 💣 Removing failed blocks");
                 }
+
                 foreach (int key2 in failedBlockIDs)
                 {
                     this.requestedSession.BlockIDs.Remove(key2);
@@ -767,7 +795,8 @@ namespace ModManager
                 yield return null;
 
                 IEnumerator<float> legacyIterator = InjectLegacyBlocksIterator(this.requestedSession, gradeBlocksPerCorp, blockSpriteDict);
-                if (legacyIterator != null) {
+                if (legacyIterator != null)
+                {
                     ModManager.CurrentOperation = "Injecting legacy modded blocks";
                     logger.Info("⏳ Injecting Legacy Modded Blocks");
                     while (legacyIterator.MoveNext())
@@ -815,6 +844,7 @@ namespace ModManager
                         }
                     }
                 }
+
                 logger.Trace($" 🟢 Initing table");
                 blockUnlockTable.Init();
             }
