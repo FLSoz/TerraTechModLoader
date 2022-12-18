@@ -485,70 +485,75 @@ namespace ModManager
 
 
         private static FieldInfo sLoaders = AccessTools.Field(typeof(JSONBlockLoader), "sLoaders");
-        private static IEnumerator LoadBlockJSON(ModContainer mod, int blockID, ModdedBlockDefinition def, TankBlock block)
+        private static IEnumerator LoadBlockJSON(ModContainer mod, int blockID, ModdedBlockDefinition def)
         {
-            if (def != null)
+            // do break here - potential fix for linux?
+            if (def == null)
             {
-                JObject jobject = null;
-                try
+                yield break;
+            }
+
+            TankBlock block = def.m_PhysicalPrefab.gameObject.GetComponent<TankBlock>();
+            JObject jobject = null;
+            try
+            {
+                if (Singleton.Manager<ManMods>.inst.ShouldReadFromRawJSON)
                 {
-                    if (Singleton.Manager<ManMods>.inst.ShouldReadFromRawJSON)
+                    string text = mod.AssetBundlePath.Substring(0, mod.AssetBundlePath.LastIndexOf('/')) + "/BlockJSON/" + def.name + ".json";
+                    if (File.Exists(text))
                     {
-                        string text = mod.AssetBundlePath.Substring(0, mod.AssetBundlePath.LastIndexOf('/')) + "/BlockJSON/" + def.name + ".json";
-                        if (File.Exists(text))
-                        {
-                            jobject = JObject.Parse(File.ReadAllText(text));
-                            logger.Info("⚠️ Read JSON from " + text + " as an override");
-                        }
-                        else
-                        {
-                            logger.Info("Block " + def.name + " could not find a JSON override at " + text);
-                        }
+                        jobject = JObject.Parse(File.ReadAllText(text));
+                        logger.Info("⚠️ Read JSON from " + text + " as an override");
                     }
-                    if (jobject == null)
+                    else
                     {
-                        jobject = JObject.Parse(def.m_Json.text);
-                        logger.Trace("   ✔️ Read JSON from asset bundle for " + def.name);
+                        logger.Info("Block " + def.name + " could not find a JSON override at " + text);
                     }
                 }
-                catch (Exception e)
+                if (jobject == null)
                 {
-                    logger.Error("   ❌ FAILED to read BlockJSON");
-                    logger.Error(e);
-                    yield break;
-                    yield break;
-                }
-                if (jobject != null)
-                {
-                    Dictionary<string, JSONModuleLoader> loaders = (Dictionary<string, JSONModuleLoader>)sLoaders.GetValue(null);
-                    foreach (KeyValuePair<string, JToken> keyValuePair in jobject)
-                    {
-                        JSONModuleLoader jsonmoduleLoader;
-                        if (loaders.TryGetValue(keyValuePair.Key, out jsonmoduleLoader))
-                        {
-                            try
-                            {
-                                logger.Trace($"   💿 Processing Loader {keyValuePair.Key}");
-                                if (!jsonmoduleLoader.CreateModuleForBlock(blockID, def, block, keyValuePair.Value))
-                                {
-                                    logger.Error(string.Format("   ❌ Failed to parse module {0} in JSON for {1}", keyValuePair.Key, def));
-                                }
-                            }
-                            catch (Exception e)
-                            {
-                                logger.Error($"   ❌ FAILED to process block module {keyValuePair.Key}");
-                                logger.Error(e);
-                            }
-                        }
-                        else
-                        {
-                            logger.Error(string.Format("   ❌ Could not parse module {0} in JSON for {1}", keyValuePair.Key, def));
-                        }
-                        yield return null;
-                    }
+                    jobject = JObject.Parse(def.m_Json.text);
+                    logger.Trace("   ✔️ Read JSON from asset bundle for " + def.name);
                 }
             }
-            yield break;
+            catch (Exception e)
+            {
+                logger.Error("   ❌ FAILED to read BlockJSON");
+                logger.Error(e);
+                yield break;
+            }
+
+            // do break here - potential fix for linux?
+            if (jobject == null)
+            {
+                yield break;
+            }
+            Dictionary<string, JSONModuleLoader> loaders = (Dictionary<string, JSONModuleLoader>)sLoaders.GetValue(null);
+            foreach (KeyValuePair<string, JToken> keyValuePair in jobject)
+            {
+                JSONModuleLoader jsonmoduleLoader;
+                if (loaders.TryGetValue(keyValuePair.Key, out jsonmoduleLoader))
+                {
+                    try
+                    {
+                        logger.Trace($"   💿 Processing Loader {keyValuePair.Key}");
+                        if (!jsonmoduleLoader.CreateModuleForBlock(blockID, def, block, keyValuePair.Value))
+                        {
+                            logger.Error(string.Format("   ❌ Failed to parse module {0} in JSON for {1}", keyValuePair.Key, def));
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        logger.Error($"   ❌ FAILED to process block module {keyValuePair.Key}");
+                        logger.Error(e);
+                    }
+                }
+                else
+                {
+                    logger.Error(string.Format("   ❌ Could not parse module {0} in JSON for {1}", keyValuePair.Key, def));
+                }
+                yield return null;
+            }
             yield break;
         }
 
@@ -627,7 +632,7 @@ namespace ModManager
                             }
 
                             logger.Trace("  📜 Preparing to load block JSON");
-                            IEnumerator jsonIterator = LoadBlockJSON(mod, blockIndex, moddedBlockDefinition, tankBlock);
+                            IEnumerator jsonIterator = LoadBlockJSON(mod, blockIndex, moddedBlockDefinition);
                             while (jsonIterator.MoveNext())
                             {
                                 yield return null;
@@ -789,7 +794,7 @@ namespace ModManager
             }
             ModManager.CurrentOperationSpecifics = null;
             yield return null;
-            yield break;
+            logger.Info("🏁 Block injection and setup complete");
             yield break;
         }
 

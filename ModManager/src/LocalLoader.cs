@@ -15,7 +15,7 @@ namespace ModManager
 
 		internal static void LoadLocalMod(string sanitizedName)
 		{
-			string localModName = sanitizedName.Replace(":/%20", " ");
+			string localModName = sanitizedName.Replace(":/%20", " ").Replace("::", " ");
 			string modPath = Path.Combine(ModManager.TTSteamDir, ManMods.LocalModsDirectory, localModName);
 			if (Directory.Exists(modPath))
 			{
