@@ -97,7 +97,8 @@ namespace ModManager
         internal static Harmony harmony = new Harmony(HarmonyID);
 
         private static List<string> LoadedMods;
-        
+
+        internal static List<WrappedMod> LateInitQueue = new List<WrappedMod>();
         internal static List<WrappedMod> EarlyInitQueue = new List<WrappedMod>();
         internal static List<WrappedMod> InitQueue = new List<WrappedMod>();
         private static List<WrappedMod> UpdateQueue = new List<WrappedMod>();
@@ -812,6 +813,7 @@ namespace ModManager
         {
             EarlyInitQueue.Clear();
             InitQueue.Clear();
+            LateInitQueue.Clear();
             UpdateQueue.Clear();
             FixedUpdateQueue.Clear();
 
@@ -906,6 +908,7 @@ namespace ModManager
             InitQueue.Clear();
             UpdateQueue.Clear();
             FixedUpdateQueue.Clear();
+            LateInitQueue.Clear();
 
             // Process the correct load order of EarlyInits
             logger.Info("🕓 Building EarlyInit dependency graph");
@@ -929,6 +932,19 @@ namespace ModManager
                 (WrappedMod mod) => { return session.m_Multiplayer || !mod.IsRemote; });
             logger.Debug("📑 Init Mod Queue: ");
             foreach (WrappedMod mod in InitQueue)
+            {
+                logger.Debug(" 🗳️ {mod}", mod.Name);
+            }
+
+            // Process the correct load order of LateInits
+            logger.Info("🕓 Building LateInit dependency graph");
+            LateInitQueue = ProcessOrder(
+                (IManagedMod mod) => { return mod.LateLoadBefore; },
+                (IManagedMod mod) => { return mod.LateLoadAfter; },
+                (WrappedMod mod) => { return mod.LateInitOrder; },
+                (WrappedMod mod) => { return session.m_Multiplayer || !mod.IsRemote; });
+            logger.Debug("📑 LateInit Mod Queue: ");
+            foreach (WrappedMod mod in LateInitQueue)
             {
                 logger.Debug(" 🗳️ {mod}", mod.Name);
             }

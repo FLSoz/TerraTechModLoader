@@ -27,7 +27,8 @@ namespace ModManager
             Corps = 4,
             Skins = 5,
             Blocks = 6,
-            Done = 7
+            LateInit = 7,
+            Done = 8
         }
 
         internal ModLoadStage CurrentStage = ModLoadStage.NotLoaded;
@@ -162,12 +163,26 @@ namespace ModManager
                             {
                                 Singleton.Manager<ManSpawn>.inst.OnDLCLoadComplete();
                                 CurrentProcess = null;
-                                return true;
+                                this.CurrentStage = ModdedContentLoader.ModLoadStage.LateInit;
+                                return false;
                             }
                             if (Time.realtimeSinceStartup > waitTime)
                             {
                                 break;
                             }
+                        }
+                        break;
+                    }
+                case ModdedContentLoader.ModLoadStage.LateInit:
+                    {
+                        if (CurrentProcess == null)
+                        {
+                            CurrentProcess = ProcessLateInits();
+                        }
+                        if (!CurrentProcess.MoveNext())
+                        {
+                            CurrentProcess = null;
+                            return true;
                         }
                         break;
                     }
@@ -321,7 +336,6 @@ namespace ModManager
             ModManager.CurrentOperationSpecifics = null;
             yield return null;
             yield break;
-            yield break;
         }
 
         private IEnumerator ProcessInits()
@@ -364,7 +378,6 @@ namespace ModManager
             }
             ModManager.CurrentOperationSpecifics = null;
             yield return null;
-            yield break;
             yield break;
         }
 
@@ -480,6 +493,49 @@ namespace ModManager
             ModManager.CurrentOperationSpecifics = null;
             yield return null;
             yield break;
+            yield break;
+        }
+
+        private IEnumerator ProcessLateInits()
+        {
+            // Process the Late Inits
+            logger.Info("⏳ Processing LateInits");
+            int numMods = ModManager.LateInitQueue.Count;
+            int processed = 0;
+            ModManager.CurrentOperation = "Code mod final setup";
+            foreach (WrappedMod script in ModManager.LateInitQueue)
+            {
+                ModManager.CurrentOperationSpecifics = $"Processing {script.Name} LateInit()";
+                logger.Debug(" 💿 Processing LateInit for mod {}", script.Name);
+                IEnumerator<float> iterator = script.LateInit();
+                while (true)
+                {
+                    try
+                    {
+                        bool toContinue = iterator.MoveNext();
+                        if (toContinue)
+                        {
+                            ModManager.CurrentOperationSpecificProgress = iterator.Current;
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        logger.Error($" ❌ Failed to process LateInit() for {script.Name}:\n{e.ToString()}");
+                        break;
+                    }
+                    yield return null;
+                }
+                logger.Debug("  ✔️ LateInit success");
+                processed++;
+                ModManager.CurrentOperationProgress = (float)processed / (float)numMods;
+                yield return null;
+            }
+            ModManager.CurrentOperationSpecifics = null;
+            yield return null;
             yield break;
         }
 

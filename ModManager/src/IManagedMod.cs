@@ -25,6 +25,11 @@ namespace ModManager
             get;
         }
 
+        int LateInitOrder
+        {
+            get;
+        }
+
         int UpdateOrder
         {
             get;
@@ -51,6 +56,16 @@ namespace ModManager
             get;
         }
         Type[] EarlyLoadBefore
+        {
+            get;
+        }
+
+        // what order to run LateInit() things in
+        Type[] LateLoadAfter
+        {
+            get;
+        }
+        Type[] LateLoadBefore
         {
             get;
         }
@@ -91,6 +106,8 @@ namespace ModManager
         IEnumerator<float> Init();
 
         IEnumerator<float> EarlyInit();
+
+        IEnumerator<float> LateInit();
 
         void Update();
 

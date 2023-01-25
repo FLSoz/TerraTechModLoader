@@ -89,6 +89,21 @@ namespace ModManager
             }
         }
 
+        public int LateInitOrder
+        {
+            get
+            {
+                if (this.managedMod != null)
+                {
+                    return this.managedMod.LateInitOrder;
+                }
+                else
+                {
+                    return ModManager.DEFAULT_LOAD_ORDER;
+                }
+            }
+        }
+
         public int UpdateOrder
         {
             get
@@ -150,7 +165,6 @@ namespace ModManager
 
         public IEnumerator<float> EarlyInit()
         {
-            yield return 0.0f;
             if (this.managedMod != null)
             {
                 ModdedContentLoader.logger.Trace("  👉 Running EarlyInit for MANAGED Mod {Mod}", Name);
@@ -178,7 +192,6 @@ namespace ModManager
 
         public IEnumerator<float> Init()
         {
-            yield return 0.0f;
             if (this.managedMod != null)
             {
                 ModdedContentLoader.logger.Trace("  👉 Running Init for MANAGED Mod {Mod}", Name);
@@ -199,7 +212,6 @@ namespace ModManager
 
         public IEnumerator<float> DeInit()
         {
-            yield return 0.0f;
             if (this.managedMod != null)
             {
                 IEnumerator<float> iterator = this.managedMod.DeInit();
@@ -211,6 +223,20 @@ namespace ModManager
             else
             {
                 this.officialMod.DeInit();
+            }
+            yield return 1.0f;
+            yield break;
+        }
+
+        public IEnumerator<float> LateInit()
+        {
+            if (this.managedMod != null)
+            {
+                IEnumerator<float> iterator = this.managedMod.LateInit();
+                while (iterator.MoveNext())
+                {
+                    yield return iterator.Current;
+                }
             }
             yield return 1.0f;
             yield break;

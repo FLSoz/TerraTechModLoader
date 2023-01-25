@@ -20,6 +20,7 @@ namespace ModManager
         private Type instanceType;
         private int _InitOrder;
         private int _EarlyInitOrder;
+        private int _LateInitOrder;
         private int _UpdateOrder;
         private int _FixedUpdateOrder;
 
@@ -28,6 +29,8 @@ namespace ModManager
 
         private MethodInfo _GetEarlyLoadAfter;
         private MethodInfo _GetEarlyLoadBefore;
+        private MethodInfo _GetLateLoadAfter;
+        private MethodInfo _GetLateLoadBefore;
         private MethodInfo _GetLoadAfter;
         private MethodInfo _GetLoadBefore;
         private MethodInfo _GetUpdateAfter;
@@ -36,10 +39,12 @@ namespace ModManager
         private MethodInfo _GetFixedUpdateBefore;
 
         private MethodInfo _ManagedEarlyInit;
+        private MethodInfo _LateInit;
 
         private MethodInfo _ManagedIteratorEarlyInit;
         private MethodInfo _ManagedIteratorInit;
         private MethodInfo _ManagedIteratorDeInit;
+        private MethodInfo _ManagedIteratorLateInit;
 
         public String Name
         {
@@ -65,6 +70,9 @@ namespace ModManager
 
             MethodInfo[] allMethods = mod.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
 
+            MethodInfo _LateInit = AccessTools.Method(mod, "LateInit");
+            MethodInfo _LateInitIterator = FirstOrNull(allMethods, m => m.Name == "LateInitIterator" && m.ReturnType == typeof(IEnumerator<float>));
+
             MethodInfo _ManagedIteratorEarlyInit = FirstOrNull(allMethods, m => m.Name == "EarlyInitIterator" && m.ReturnType == typeof(IEnumerator<float>));
             MethodInfo _ManagedIteratorInit = FirstOrNull(allMethods, m => m.Name == "InitIterator" && m.ReturnType == typeof(IEnumerator<float>));
             MethodInfo _ManagedIteratorDeInit = FirstOrNull(allMethods, m => m.Name == "DeInitIterator" && m.ReturnType == typeof(IEnumerator<float>));
@@ -72,6 +80,7 @@ namespace ModManager
             FieldInfo _LoadOrder = AccessTools.Field(mod, "LoadOrder");
             FieldInfo _InitOrder = AccessTools.Field(mod, "InitOrder");
             FieldInfo _EarlyInitOrder = AccessTools.Field(mod, "EarlyInitOrder");
+            FieldInfo _LateInitOrder = AccessTools.Field(mod, "LateInitOrder");
 
             MethodInfo _GetLoadAfter = AccessTools.Method(mod, "LoadAfter");
             MethodInfo _GetLoadBefore = AccessTools.Method(mod, "LoadBefore");
@@ -170,6 +179,18 @@ namespace ModManager
 
             managedMod._ManagedIteratorInit = _ManagedIteratorInit;
             managedMod._ManagedIteratorDeInit = _ManagedIteratorDeInit;
+
+            if (_LateInitOrder != null)
+            {
+                managedMod._LateInitOrder = (int)_LateInitOrder.GetValue(null);
+            }
+            if (_LateInit != null || _LateInitIterator != null)
+            {
+                managedMod._LateInit = _LateInit;
+                managedMod._ManagedIteratorLateInit = _LateInitIterator;
+                managedMod._GetLateLoadAfter = AccessTools.Method(mod, "LateLoadAfter");
+                managedMod._GetLateLoadBefore = AccessTools.Method(mod, "LateLoadBefore");
+            }
             return managedMod;
         }
 
@@ -184,6 +205,8 @@ namespace ModManager
         public int UpdateOrder => this._UpdateOrder;
 
         public int FixedUpdateOrder => this._FixedUpdateOrder;
+
+        public int LateInitOrder => this._LateInitOrder;
 
         public Type[] EarlyLoadAfter {
             get {
@@ -202,6 +225,30 @@ namespace ModManager
                 if (this._GetEarlyLoadBefore != null)
                 {
                     return (Type[])this._GetEarlyLoadBefore.Invoke(null, null);
+                }
+                return null;
+            }
+        }
+
+        public Type[] LateLoadAfter
+        {
+            get
+            {
+                if (this._GetLateLoadAfter != null)
+                {
+                    return (Type[])this._GetLateLoadAfter.Invoke(null, null);
+                }
+                return null;
+            }
+        }
+
+        public Type[] LateLoadBefore
+        {
+            get
+            {
+                if (this._GetLateLoadBefore != null)
+                {
+                    return (Type[])this._GetLateLoadBefore.Invoke(null, null);
                 }
                 return null;
             }
@@ -351,6 +398,29 @@ namespace ModManager
             {
                 ModdedContentLoader.logger.Trace($"   🔨 Standard Init of {this.instanceType.FullName}");
                 this.Instance.Init();
+            }
+            yield break;
+        }
+
+        public IEnumerator<float> LateInit()
+        {
+            if (this._ManagedIteratorLateInit != null)
+            {
+                ModdedContentLoader.logger.Trace($"   🛠️ Iterator LateInit of {this.instanceType.FullName}");
+                IEnumerator<float> iterator = (IEnumerator<float>)this._ManagedIteratorLateInit.Invoke(this.Instance, null);
+                while (iterator.MoveNext())
+                {
+                    yield return iterator.Current;
+                }
+            }
+            else if (this._LateInit != null)
+            {
+                ModdedContentLoader.logger.Trace($"   🛠️ Managed LateInit of {this.instanceType.FullName}");
+                this._LateInit.Invoke(this.Instance, null);
+            }
+            else
+            {
+                ModdedContentLoader.logger.Trace($"   🛈 NO LateInit of {this.instanceType.FullName}");
             }
             yield break;
         }
