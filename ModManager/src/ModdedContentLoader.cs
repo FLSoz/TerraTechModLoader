@@ -755,6 +755,15 @@ namespace ModManager
                             blockNames.Add(blockIndex, moddedBlockDefinition.m_BlockDisplayName);
                             blockDescriptions.Add(blockIndex, moddedBlockDefinition.m_BlockDescription);
                             reverseLookup.Add(moddedBlockDefinition.name, blockIndex);
+                            if (moddedBlockDefinition.name != moddedBlockDefinition.m_BlockDisplayName)
+                            {
+                                logger.Debug($"   Injecting display name backup {{block}} at {blockIndex}", moddedBlockDefinition.m_BlockDisplayName);
+                                reverseLookup.Add(moddedBlockDefinition.m_BlockDisplayName, blockIndex);
+                            }
+                            else
+                            {
+                                logger.Warn($" 🚨 Block {{block}} shares a display name?", moddedBlockDefinition.name);
+                            }
                             Singleton.Manager<ManSpawn>.inst.AddBlockToDictionary(physicalPrefab.gameObject, blockIndex);
                             Singleton.Manager<ManSpawn>.inst.VisibleTypeInfo.SetDescriptor<FactionSubTypes>(hashCode, corpIndex);
                             Singleton.Manager<ManSpawn>.inst.VisibleTypeInfo.SetDescriptor<BlockCategories>(hashCode, moddedBlockDefinition.m_Category);
