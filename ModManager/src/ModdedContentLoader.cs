@@ -645,6 +645,9 @@ namespace ModManager
                     }
                     if (moddedBlockDefinition != null)
                     {
+                        ModManager.CurrentOperationSpecifics = moddedBlockDefinition.m_BlockDisplayName;
+                        yield return null;
+
                         int hashCode = ItemTypeInfo.GetHashCode(ObjectTypes.Block, blockIndex);
                         FactionSubTypes corpIndex = manMods.GetCorpIndex(moddedBlockDefinition.m_Corporation, this.requestedSession);
                         TankBlockTemplate physicalPrefab = moddedBlockDefinition.m_PhysicalPrefab;
@@ -691,7 +694,6 @@ namespace ModManager
                             IEnumerator jsonIterator = LoadBlockJSON(mod, blockIndex, moddedBlockDefinition);
                             while (jsonIterator.MoveNext())
                             {
-                                yield return null;
                             }
                             logger.Trace("  ✔️ Block JSON loaded");
                             try
@@ -747,8 +749,6 @@ namespace ModManager
                             logger.Trace(" 🛠️ Updating component pool");
                             physicalPrefab.transform.CreatePool(8);
                         }
-
-                        ModManager.CurrentOperationSpecifics = moddedBlockDefinition.m_BlockDisplayName;
 
                         try
                         {
