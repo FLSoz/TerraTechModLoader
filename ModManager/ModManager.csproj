@@ -123,6 +123,7 @@
     <Compile Include="src\patches\ModSessionPatches.cs" />
     <Compile Include="src\patches\MultiplayerPatches.cs" />
     <Compile Include="src\patches\ModLoadingPatches.cs" />
+    <Compile Include="src\patches\PatchRecipeList.cs" />
     <Compile Include="src\patches\SerializationLoggingPatches.cs" />
     <Compile Include="src\patches\TTMMPatches.cs" />
     <Compile Include="src\QMod.cs" />
