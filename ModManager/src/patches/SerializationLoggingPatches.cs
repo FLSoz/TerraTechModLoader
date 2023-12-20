@@ -160,7 +160,6 @@ namespace ModManager.patches
             internal static readonly Type TechDataCacheType = AccessTools.Inner(typeof(SnapshotServiceDesktop), "TechDataCache");
             internal static readonly MethodInfo CustomLoadObject = AccessTools.Method(typeof(PatchSnapshotLoading), nameof(PatchSnapshotLoading.LoadObject), generics: new Type[] { TechDataCacheType });
             internal static readonly FieldInfo techSnapshotData = AccessTools.Field(TechDataCacheType, "techSnapshotData");
-            internal static readonly FieldInfo m_FavouritedSnapshotUIDS = AccessTools.Field(typeof(SnapshotServiceDesktop), "m_FavouritedSnapshotUIDs");
 
             internal static bool LoadObject<T>(ref T objectToLoad, string path, bool assertOnFail = true, bool validate = false)
             {
@@ -226,8 +225,10 @@ namespace ModManager.patches
                     snapshotDisk.techData = snapshotData.CreateTechData();
                     snapshotDisk.UniqueID = fileInfo.FullName;
                     snapshotDisk.DateCreated = fileInfo.CreationTime;
-                    HashSet<string> favoriteSnaps = (HashSet<string>) m_FavouritedSnapshotUIDS.GetValue(__instance);
-                    snapshotDisk.m_IsFavourite.Value = favoriteSnaps.Contains(snapshotDisk.UniqueID);
+                    if (__instance.SupportsMetadata())
+                    {
+                        __instance.ApplyCachedMetadataToSnapshot(snapshotDisk);
+                    }
                 }
                 else
                 {
