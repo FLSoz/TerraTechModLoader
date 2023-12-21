@@ -260,6 +260,7 @@ namespace ModManager.patches
                             ModManager.CurrentSessionLoaded = true;
                             loader.Finish();
 
+                            __instance.ModSessionLoadCompleteEvent.Send();
                             PatchContentInjection.Postfix(requestedSession);
                         }
                     }

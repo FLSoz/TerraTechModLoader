@@ -161,6 +161,7 @@ namespace ModManager
                             bool toContinue = CurrentProcess.MoveNext();
                             if (!toContinue)
                             {
+                                ModdedContentLoader.manMods.BlocksModifiedEvent.Send();
                                 Singleton.Manager<ManSpawn>.inst.OnDLCLoadComplete();
                                 CurrentProcess = null;
                                 this.CurrentStage = ModdedContentLoader.ModLoadStage.LateInit;
