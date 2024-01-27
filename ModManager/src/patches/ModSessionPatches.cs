@@ -226,6 +226,7 @@ namespace ModManager.patches
                             {
                                 ModManager.logger.Info("✔️ Mod session remaining the same");
                                 ReflectedManMods.m_RequestedSession.SetValue(__instance, null);
+                                __instance.ModSessionLoadCompleteEvent.Send();
                             }
                             else
                             {
