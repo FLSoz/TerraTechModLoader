@@ -7,6 +7,8 @@ using System.Reflection;
 using HarmonyLib;
 using TerraTech.Network;
 using Steamworks;
+using NLog;
+using static CompoundExpression;
 
 namespace ModManager.patches
 {
@@ -251,22 +253,70 @@ namespace ModManager.patches
                         }
                     }
                     loadingRequestedSessionInProgress = (bool)ReflectedManMods.m_LoadingRequestedSessionInProgress.GetValue(__instance);
-                    if (loadingRequestedSessionInProgress && !__instance.HasPendingLoads())
+                    if (loadingRequestedSessionInProgress)
                     {
-                        ModdedContentLoader loader = ModManager.contentLoader;
-                        if (loader.InjectModdedContent())
+                        if (!__instance.HasPendingLoads())
                         {
-                            ReflectedManMods.m_RequestedSession.SetValue(__instance, null);
-                            ReflectedManMods.m_LoadingRequestedSessionInProgress.SetValue(__instance, false);
-                            ModManager.CurrentSessionLoaded = true;
-                            loader.Finish();
+                            ModdedContentLoader loader = ModManager.contentLoader;
+                            if (loader.InjectModdedContent())
+                            {
+                                ReflectedManMods.m_RequestedSession.SetValue(__instance, null);
+                                ReflectedManMods.m_LoadingRequestedSessionInProgress.SetValue(__instance, false);
+                                ModManager.CurrentSessionLoaded = true;
+                                loader.Finish();
 
-                            __instance.ModSessionLoadCompleteEvent.Send();
-                            PatchContentInjection.Postfix(requestedSession);
+                                __instance.ModSessionLoadCompleteEvent.Send();
+                                PatchContentInjection.Postfix(requestedSession);
+                            }
+                        }
+                        else
+                        {
+                            ModManager.logger.Trace("Pending loads detected:");
+                            ModManager.logger.Trace($"  Currently loading: [{ReflectedManMods.m_CurrentlyLoading.GetValue(__instance)}]");
+                            Queue<string> pendingLoads = (Queue<string>) ReflectedManMods.m_PendingLoads.GetValue(__instance);
+                            ModManager.logger.Trace($"  Pending loads");
+                            foreach (string pendingLoad in pendingLoads)
+                            {
+                                ModManager.logger.Trace($"    - {pendingLoad}");
+                            }
                         }
                     }
                 }
+                else if (loadingRequestedSessionInProgress)
+                {
+                    ModManager.logger.Error("LOAD REQUESTED WHILE REQUESTED SESSION IS NULL");
+                }
                 return false;
+            }
+        }
+
+        [HarmonyPatch(typeof(ManMods), "Update")]
+        public static class PatchPendingLoadsLog
+        {
+            public static void Postfix(ManMods __instance)
+            {
+                if (__instance.HasPendingLoads())
+                {
+                    ModManager.logger.Trace("Pending loads detected:");
+                    ModManager.logger.Trace($"  Currently loading: [{ReflectedManMods.m_CurrentlyLoading.GetValue(__instance)}]");
+                    Queue<string> pendingLoads = (Queue<string>)ReflectedManMods.m_PendingLoads.GetValue(__instance);
+                    ModManager.logger.Trace($"  Pending loads");
+                    foreach (string pendingLoad in pendingLoads)
+                    {
+                        ModManager.logger.Trace($"    - {pendingLoad}");
+                    }
+                }
+                if (__instance.IsPollingWorkshop())
+                {
+                    ModManager.logger.Trace("Waiting on workshop detected:");
+                    List<PublishedFileId_t> waitingOnDownload = (List<PublishedFileId_t>)ReflectedManMods.m_WaitingOnDownloads.GetValue(__instance);
+                    ModManager.logger.Trace($"  Waiting on workshop polls for:");
+                    foreach (PublishedFileId_t workshopId in waitingOnDownload)
+                    {
+                        ModManager.logger.Trace($"    - {workshopId}");
+                    }
+                    ModManager.logger.Trace($"  Waiting on workshop check: {ReflectedManMods.m_WaitingOnWorkshopCheck.GetValue(__instance)}");
+                }
             }
         }
 

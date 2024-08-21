@@ -175,6 +175,7 @@ namespace ModManager.patches
                     if (bundle == null)
                     {
                         ModManager.logger.Error("Load AssetBundle at path {Path} failed for mod {Mod}", container.AssetBundlePath, container.ModID);
+                        ModErrorHandling.SetModFailingReason(container, ModErrorHandling.ModFailReason.InvalidBundle, null);
                         container.OnLoadFailed();
                         yield return 1f;
                     }
@@ -187,6 +188,7 @@ namespace ModManager.patches
                     if (contents == null)
                     {
                         ModManager.logger.Error("Load AssetBundle Contents.asset failed for mod {Mod}", container.ModID);
+                        ModErrorHandling.SetModFailingReason(container, ModErrorHandling.ModFailReason.InvalidBundleContents, null);
                         container.OnLoadFailed();
                         yield return 1f;
                     }

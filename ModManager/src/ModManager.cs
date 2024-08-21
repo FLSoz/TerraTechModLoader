@@ -14,6 +14,7 @@ using Payload.UI.Commands.Steam;
 using Newtonsoft.Json.Linq;
 using System.Runtime.CompilerServices;
 using UnityEngine;
+using System.ComponentModel;
 
 namespace ModManager
 {
@@ -731,6 +732,7 @@ namespace ModManager
             catch (System.Reflection.ReflectionTypeLoadException ex)
             {
                 logger.Error("  ❌ Failed to get types for {Assembly} - assuming dependency failure, saving for forced reload", assembly.FullName);
+                ModErrorHandling.SetModFailingReason(modContainer, ModErrorHandling.ModFailReason.ErrorLoadingScripts, assembly.FullName);
                 logger.Error(ex);
                 return null;
             }
@@ -783,6 +785,7 @@ namespace ModManager
                         catch (Exception e)
                         {
                             logger.Error($"  Failed to create a Managed Mod for {type}:\n{e}");
+                            ModErrorHandling.SetModFailingReason(modContainer, ModErrorHandling.ModFailReason.ErrorLoadingScripts, type.FullName);
                         }
                     }
                     else
@@ -855,29 +858,38 @@ namespace ModManager
                         // Ignore loading ModManager
                         if (fileInfo.Extension == ".dll" && !fileInfo.Name.Contains("ModManager") && !fileInfo.Name.Contains("AssemblyLoader") && !fileInfo.Name.Contains("NLog"))
                         {
-                            Assembly assembly = Assembly.LoadFrom(fileInfo.FullName);
-                            logger.Trace($" 📦 Checking dll ${fileInfo.FullName}");
-                            if (assemblyMetadata.TryGetValue(assembly, out ModContainer existingMod))
+                            try
                             {
-                                logger.Debug("  ⏩ Attempting to load assembly {Assembly} as part of Mod {Mod} ({ModID} - {ModLocal}), but assembly is already loaded by mod {ExistingMod} ({ExistingModID} - {ExistingModLocal})",
-                                    assembly.FullName,
-                                    modContainer.Contents.ModName, modContainer.ModID,
-                                    modContainer.Contents.m_WorkshopId != PublishedFileId_t.Invalid ? modContainer.Contents.m_WorkshopId.ToString() : "LOCAL",
-                                    existingMod.Contents.ModName, existingMod.ModID,
-                                    existingMod.Contents.m_WorkshopId != PublishedFileId_t.Invalid ? existingMod.Contents.m_WorkshopId.ToString() : "LOCAL"
-                                );
-                            }
-                            else
-                            {
-                                assemblyMetadata.Add(assembly, modContainer);
-                                List<WrappedMod> foundMods = ProcessLoadAssembly(modContainer, assembly);
-                                if (foundMods != null)
+                                Assembly assembly = Assembly.LoadFrom(fileInfo.FullName);
+                                logger.Trace($" 📦 Checking dll ${fileInfo.FullName}");
+                                if (assemblyMetadata.TryGetValue(assembly, out ModContainer existingMod))
                                 {
-                                    foreach (WrappedMod wrappedMod in foundMods)
+                                    logger.Debug("  ⏩ Attempting to load assembly {Assembly} as part of Mod {Mod} ({ModID} - {ModLocal}), but assembly is already loaded by mod {ExistingMod} ({ExistingModID} - {ExistingModLocal})",
+                                        assembly.FullName,
+                                        modContainer.Contents.ModName, modContainer.ModID,
+                                        modContainer.Contents.m_WorkshopId != PublishedFileId_t.Invalid ? modContainer.Contents.m_WorkshopId.ToString() : "LOCAL",
+                                        existingMod.Contents.ModName, existingMod.ModID,
+                                        existingMod.Contents.m_WorkshopId != PublishedFileId_t.Invalid ? existingMod.Contents.m_WorkshopId.ToString() : "LOCAL"
+                                    );
+                                }
+                                else
+                                {
+                                    assemblyMetadata.Add(assembly, modContainer);
+                                    List<WrappedMod> foundMods = ProcessLoadAssembly(modContainer, assembly);
+                                    if (foundMods != null)
                                     {
-                                        modMetadata.Add(wrappedMod, modContainer);
+                                        foreach (WrappedMod wrappedMod in foundMods)
+                                        {
+                                            modMetadata.Add(wrappedMod, modContainer);
+                                        }
                                     }
                                 }
+                            }
+                            catch (Exception ex)
+                            {
+                                logger.Error("  ❌ Failed to load assembly {Assembly} - assuming dependency failure, saving for forced reload", fileInfo.FullName);
+                                ModErrorHandling.SetModFailingReason(modContainer, ModErrorHandling.ModFailReason.ErrorLoadingScripts, fileInfo.FullName);
+                                logger.Error(ex);
                             }
                         }
                     }

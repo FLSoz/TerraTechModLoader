@@ -43,7 +43,7 @@ namespace ModManager
 				ModManager.logger.Error("Mod asset {Name} doesn't end with _bundle", text);
 			}
 			m_WaitingOnDownloads.Remove(result.m_Details.m_nPublishedFileId);
-			ModContainer modContainer = new ModContainer(text, result.m_FileInfo.FullName, false);
+			ModContainer modContainer = new ModContainer(text, result.m_FileInfo.FullName, false, result.m_Details.m_nPublishedFileId.ToString());
 			modContainer.IsRemote = remote;
 			if (!modContainer.HasValidID)
 			{
@@ -78,6 +78,7 @@ namespace ModManager
 				modContainer.AssetBundlePath,
 				modContainer2.AssetBundlePath
 			);
+			ModErrorHandling.SetModFailingReason(modContainer, ModErrorHandling.ModFailReason.DuplicateID, "Duplicate mod path: " + modContainer2.AssetBundlePath);
 		}
 
 		internal static void OnDownloadCancelled(SteamDownloadItemData result, SteamDownloadItemData item)

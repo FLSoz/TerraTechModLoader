@@ -13,11 +13,15 @@ namespace ModManager
         internal static readonly FieldInfo m_AutoAddModsToAuthoritativeSessions = AccessTools.Field(typeof(ManMods), "m_AutoAddModsToAuthoritativeSessions");
         internal static readonly FieldInfo m_Mods = AccessTools.Field(typeof(ManMods), "m_Mods");
         internal static readonly FieldInfo m_WaitingOnDownloads = AccessTools.Field(typeof(ManMods), "m_WaitingOnDownloads");
+        internal static readonly FieldInfo m_WaitingOnWorkshopCheck = AccessTools.Field(typeof(ManMods), "m_WaitingOnWorkshopCheck");
         internal static readonly FieldInfo m_ReloadAllPending = AccessTools.Field(typeof(ManMods), "m_ReloadAllPending");
         internal static readonly FieldInfo m_CorpIDReverseLookup = AccessTools.Field(typeof(ManMods), "m_CorpIDReverseLookup");
         internal static readonly FieldInfo m_BlockNames = AccessTools.Field(typeof(ManMods), "m_BlockNames");
         internal static readonly FieldInfo m_BlockDescriptions = AccessTools.Field(typeof(ManMods), "m_BlockDescriptions");
         internal static readonly FieldInfo m_BlockIDReverseLookup = AccessTools.Field(typeof(ManMods), "m_BlockIDReverseLookup");
+
+        internal static readonly FieldInfo m_CurrentlyLoading = AccessTools.Field(typeof(ManMods), "m_CurrentlyLoading");
+        internal static readonly FieldInfo m_PendingLoads = AccessTools.Field(typeof(ManMods), "m_PendingLoads");
 
         internal static readonly MethodInfo RequestModLoad = AccessTools.Method(typeof(ManMods), "RequestModLoad");
         internal static readonly MethodInfo CheckReparseAllJsons = AccessTools.Method(typeof(ManMods), "CheckReparseAllJsons");
@@ -33,5 +37,8 @@ namespace ModManager
         internal static readonly MethodInfo SessionRequiresRestart = AccessTools.Method(typeof(ManMods), "SessionRequiresRestart");
         internal static readonly MethodInfo RequestRestartGame = AccessTools.Method(typeof(ManMods), "RequestRestartGame");
         internal static readonly MethodInfo InjectCustomSkinReferences = AccessTools.Method(typeof(ManMods), "InjectCustomSkinReferences");
+        internal static readonly MethodInfo HandleModLoadingFailed = AccessTools.Method(typeof(ManMods), "HandleModLoadingFailed");
+        internal static readonly MethodInfo RunBlockSpawnTest = AccessTools.Method(typeof(ManMods), "RunBlockSpawnTest");
+        internal static readonly MethodInfo CleanupBlockSpawnTestTech = AccessTools.Method(typeof(ManMods), "CleanupBlockSpawnTestTech");
     }
 }

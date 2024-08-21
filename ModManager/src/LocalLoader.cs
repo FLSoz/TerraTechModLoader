@@ -26,7 +26,7 @@ namespace ModManager
 					"/",
 					localModName,
 					"_bundle"
-				}), true);
+				}), true, "local:/" + localModName);
 				if (modContainer.HasValidID)
 				{
 					if (!mods.ContainsKey(modContainer.ModID))
@@ -42,7 +42,8 @@ namespace ModManager
 							modContainer.ModID,
 							localModName,
 							mods[modContainer.ModID].AssetBundlePath);
-					}
+                        ModErrorHandling.SetModFailingReason(modContainer, ModErrorHandling.ModFailReason.DuplicateID, "Duplicate mod path: " + mods[modContainer.ModID].AssetBundlePath);
+                    }
 				}
 				else
 				{
